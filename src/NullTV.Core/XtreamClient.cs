@@ -89,7 +89,7 @@ public sealed class XtreamClient(HttpClient http)
     private static string Decode(string s) { try { return Encoding.UTF8.GetString(Convert.FromBase64String(s)); } catch (FormatException) { return s; } }
     public static string CatchupUrl(Source s, MediaItem item, Programme p)
     {
-        if (item.ArchiveDays <= 0 || p.Start > DateTimeOffset.UtcNow || p.Start < DateTimeOffset.UtcNow.AddDays(-item.ArchiveDays)) throw new InvalidDataException("This programme is outside the provider's archive window.");
+        if (item.ArchiveDays <= 0 || p.Start > DateTimeOffset.UtcNow || p.Start < DateTimeOffset.UtcNow.AddDays(-item.ArchiveDays)) throw new InvalidDataException("This program is outside the provider's archive window.");
         if (item.Catchup == "xtream")
             return new Uri(BaseUri(s), $"timeshift/{Uri.EscapeDataString(s.Username)}/{Uri.EscapeDataString(s.Password)}/{Math.Max(1,(int)Math.Ceiling((p.End-p.Start).TotalMinutes))}/{p.Start.UtcDateTime:yyyy-MM-dd:HH-mm}/{Uri.EscapeDataString(item.ProviderId)}.ts").AbsoluteUri;
         if (item.CatchupTemplate != "")

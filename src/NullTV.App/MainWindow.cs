@@ -192,7 +192,7 @@ public sealed partial class MainWindow : Window
                 await GuardAsync(async ()=> { status.Text=$"Refreshing {s.Name}…"; var service=new SourceService(http,store); var catalog=await Task.Run(()=>service.RefreshAsync(s,lifetime.Token)); catalogs[s.Id]=catalog; RebuildItems(); await store.SaveAsync(settings); try { epgs[s.Id]=await Task.Run(()=>service.LoadEpgAsync(s,catalog,lifetime.Token)); await IndexGuidesAsync(); UpdateNowNext(); await store.SaveGuideAsync(s.Id,epgs[s.Id]); } catch(Exception e) { status.Text="Channels loaded. EPG unavailable; set an XMLTV override in Sources."; await log.WriteAsync("EPG_FAILED",e); } });
             }
             UpdateLive(); if(!settings.Profile.Sources.Any()) status.Text="Welcome. Add your provider or playlist in Settings → Sources to get started.";
-            else status.Text=$"{items.Count:N0} items · {settings.Profile.Sources.Count} sources · {epgs.Values.Sum(x=>x.Count):N0} guide programmes";
+            else status.Text=$"{items.Count:N0} items · {settings.Profile.Sources.Count} sources · {epgs.Values.Sum(x=>x.Count):N0} guide programs";
         }
         finally { busy=false; refreshGate.Release(); }
     }

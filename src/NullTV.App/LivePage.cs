@@ -75,17 +75,19 @@ public sealed partial class MainWindow
         playingTitle=Text("PLAYER",10); playingTitle.CharacterSpacing=100; playingTitle.Opacity=.5; playingInfo=Text("",12); playingInfo.Opacity=.5; var playerHeading=Stack(playingTitle,playingInfo); playerHeading.Spacing=5; Place(stage,playerHeading);
         videoGrid=new Grid { Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(SurfaceHex)),ColumnSpacing=8,RowSpacing=8 };
         surface=CreateSurface(); videoGrid.Children.Add(surface); emptyLive=new Grid(); videoGrid.Children.Add(emptyLive); videoHome=Card(videoGrid,new Thickness(0)); Place(stage,videoHome,1);
-        seek=new Slider { Minimum=0,Maximum=1,MinHeight=32,IsEnabled=false };
+        seek=new PlaybackSlider { Minimum=0,Maximum=1,MinHeight=20,Height=20,IsEnabled=false };
         seek.AddHandler(UIElement.PointerPressedEvent,new PointerEventHandler((_,_)=>seeking=true),true);
         seek.AddHandler(UIElement.PointerReleasedEvent,new PointerEventHandler((_,_)=> { if(surface?.Player!=null) surface.Player.Command("seek",seek.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),"absolute"); seeking=false; }),true);
         seek.KeyUp+=(_,e)=> { if(e.Key is VirtualKey.Left or VirtualKey.Right && seek.IsEnabled) surface?.Player?.Command("seek",seek.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),"absolute"); };
         progressArea=new Grid { ColumnSpacing=12 }; progressArea.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); progressArea.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); progressArea.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); elapsedLabel=Text("0:00",11); durationLabel=Text("0:00",11); elapsedLabel.VerticalAlignment=durationLabel.VerticalAlignment=VerticalAlignment.Center; elapsedLabel.Opacity=durationLabel.Opacity=.8; Place(progressArea,elapsedLabel); Place(progressArea,seek,0,1); Place(progressArea,durationLabel,0,2);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(seek,"Playback position");
-        liveBar=new Grid { ColumnSpacing=12 }; liveBar.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); liveBar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        liveBar=new Grid { ColumnSpacing=8,HorizontalAlignment=HorizontalAlignment.Center }; liveBar.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); liveBar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var goLive=Button("●  LIVE",()=>_=GuardAsync(GoLiveAsync)); goLive.Padding=new Thickness(12,4,12,4); goLive.MinHeight=32; goLive.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B")); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(goLive,"Go live"); ToolTipService.SetToolTip(goLive,"Return to the current live feed"); Place(liveBar,goLive);
         livePositionLabel=Text("Watching live",11); livePositionLabel.VerticalAlignment=VerticalAlignment.Center; Place(liveBar,livePositionLabel,0,1);
-        playerControls=new Grid { ColumnSpacing=8 }; playerControls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); playerControls.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); playerControls.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
-        var transport=new StackPanel { Orientation=Orientation.Horizontal,Spacing=4 }; var tools=new StackPanel { Orientation=Orientation.Horizontal,Spacing=4 };
+        liveBar.RowDefinitions.Add(new() { Height=GridLength.Auto }); liveBar.RowDefinitions.Add(new() { Height=GridLength.Auto });
+        var liveTrack=new Border { Height=2,CornerRadius=new CornerRadius(1),Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B")),Margin=new Thickness(4,1,4,0) }; Grid.SetColumnSpan(liveTrack,2); Place(liveBar,liveTrack,1);
+        playerControls=new Grid { ColumnSpacing=8,HorizontalAlignment=HorizontalAlignment.Center }; playerControls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); playerControls.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
+        var transport=new StackPanel { Orientation=Orientation.Horizontal,Spacing=3 }; var tools=new StackPanel { Orientation=Orientation.Horizontal,Spacing=3 };
         previousButton=IconButton("\uE892","Previous channel",()=>ChannelStep(-1)); transport.Children.Add(previousButton);
         rewindButton=Button("−10",()=>SeekRelative(-10)); rewindButton.Padding=new Thickness(8); ToolTipService.SetToolTip(rewindButton,"Rewind 10 seconds"); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(rewindButton,"Rewind 10 seconds"); transport.Children.Add(rewindButton);
         primaryTransport=IconButton("\uE768","Play",ActivateTransport); primaryTransport.Width=48; primaryTransport.Height=48; primaryTransport.CornerRadius=new CornerRadius(24); primaryTransport.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(settings.Appearance.Accent)); primaryTransport.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#21222C")); transport.Children.Add(primaryTransport);
@@ -93,29 +95,53 @@ public sealed partial class MainWindow
         nextButton=IconButton("\uE893","Next channel",()=>ChannelStep(1)); transport.Children.Add(nextButton);
         stopButton=IconButton("\uE71A","Stop",StopPlayback); transport.Children.Add(stopButton);
         muteButton=IconButton("\uE767","Mute",()=>surface?.Player?.Command("cycle","mute")); tools.Children.Add(muteButton);
-        volumeControl=new Slider { Minimum=0,Maximum=100,Value=settings.Playback.Volume,MinHeight=44,Width=84 }; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(volumeControl,"Volume"); volumeControl.ValueChanged+=(_,e)=> { if(updatingTransport) return; foreach(var v in surfaces) v.Player?.Set("volume",e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)); }; tools.Children.Add(volumeControl);
+        volumeControl=new PlaybackSlider { Minimum=0,Maximum=100,Value=settings.Playback.Volume,MinHeight=44,Width=84 }; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(volumeControl,"Volume"); volumeControl.ValueChanged+=(_,e)=> { if(updatingTransport) return; foreach(var v in surfaces) v.Player?.Set("volume",e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)); }; tools.Children.Add(volumeControl);
         subtitlesButton=Button("CC",()=>_=GuardAsync(SubtitlesMenuAsync)); subtitlesButton.Padding=new Thickness(8); subtitlesButton.Width=44; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(subtitlesButton,"Subtitles and closed captions"); ToolTipService.SetToolTip(subtitlesButton,"Subtitles and closed captions"); tools.Children.Add(subtitlesButton);
         favoriteButton=IconButton("\uE734","Add to favorites",()=> { var item=playing??lastPlayed; if(item!=null) _=GuardAsync(()=>ToggleFavoriteAsync(item)); }); tools.Children.Add(favoriteButton);
         expandButton=IconButton("\uE8A7","Expand video in window",ToggleExpandedVideo); tools.Children.Add(expandButton);
         tools.Children.Add(IconButton("\uE740","Fullscreen",ToggleFullscreen)); var more=IconButton("\uE712","Playback options",()=>_=GuardAsync(PlaybackMenuAsync)); tools.Children.Add(more);
-        Place(playerControls,transport); Place(playerControls,tools,0,2);
+        Place(playerControls,transport); Place(playerControls,tools,0,1);
         var timeline=new Grid(); timeline.Children.Add(progressArea); timeline.Children.Add(liveBar);
         var overlayContent=Stack(timeline,playerControls); overlayContent.Spacing=8;
         var transportCard=Card(overlayContent,new Thickness(12)); transportCard.CornerRadius=new CornerRadius(14); controlsCard=transportCard;
         streamInfo=Text("Waiting for stream information…",11); streamInfo.LineHeight=22; streamInfo.TextWrapping=TextWrapping.NoWrap; streamInfo.TextTrimming=TextTrimming.CharacterEllipsis;
-        var infoHeading=Text("STREAM INFO",10); infoHeading.CharacterSpacing=120; infoHeading.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#BD93F9"));
+        var infoHeading=Text("STREAM INFO",10); infoHeading.CharacterSpacing=120; infoHeading.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#F1FA8C"));
         var infoContent=Stack(infoHeading,streamInfo); infoContent.Spacing=8; var infoCard=Card(infoContent,new Thickness(14)); infoCard.CornerRadius=new CornerRadius(14);
+        foreach(var card in new[]{transportCard,infoCard}) { card.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#B021222C")); card.BorderBrush=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#30F8F8F2")); card.BorderThickness=new Thickness(.5); card.CornerRadius=new CornerRadius(8); card.HorizontalAlignment=HorizontalAlignment.Left; card.VerticalAlignment=VerticalAlignment.Top; }
         transportCard.RequestedTheme=infoCard.RequestedTheme=ElementTheme.Dark;
         foreach(var entry in root.Resources) transportCard.Resources[entry.Key]=entry.Value;
         foreach(var slider in new[]{seek,volumeControl})
         {
-            var purple=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(settings.Appearance.Accent));
-            slider.Foreground=purple; slider.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#44475A"));
-            foreach(var key in new[]{"SliderTrackValueFill","SliderTrackValueFillPointerOver","SliderTrackValueFillPressed","SliderThumbBackground","SliderThumbBackgroundPointerOver","SliderThumbBackgroundPressed","AccentFillColorDefaultBrush","AccentFillColorSecondaryBrush","AccentFillColorTertiaryBrush"}) slider.Resources[key]=purple;
+            var green=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B"));
+            slider.Foreground=green; slider.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#44475A")); slider.Resources["SliderTrackThemeHeight"]=2d;
+            foreach(var key in new[]{"SliderTrackValueFill","SliderTrackValueFillPointerOver","SliderTrackValueFillPressed","SliderThumbBackground","SliderThumbBackgroundPointerOver","SliderThumbBackgroundPressed","AccentFillColorDefaultBrush","AccentFillColorSecondaryBrush","AccentFillColorTertiaryBrush"}) slider.Resources[key]=green;
         }
         transportCard.KeyDown+=OnKey;
         playerOverlay=new(this,transportCard,infoCard,()=> (surface,IsPlayerVisible && playing!=null && dialogDepth==0 && surface!=null && active.ContainsKey(surface)),()=>surface?.Focus(FocusState.Programmatic));
-        playerOverlay.LayoutChanged+=(width,compact)=> { compactVideoControls=compact; transportCard.Padding=new Thickness(compact ? 8 : 12); overlayContent.Spacing=compact ? 4 : 8; infoHeading.Visibility=compact ? Visibility.Collapsed : Visibility.Visible; streamInfo.MaxLines=compact ? 2 : 0; streamInfo.LineHeight=compact ? 18 : 22; infoCard.Padding=new Thickness(compact ? 8 : 14); if(volumeControl!=null) volumeControl.Visibility=width>=760 ? Visibility.Visible : Visibility.Collapsed; if(expandButton!=null) expandButton.Visibility=width>=580 ? Visibility.Visible : Visibility.Collapsed; if(favoriteButton!=null) favoriteButton.Visibility=width>=520 ? Visibility.Visible : Visibility.Collapsed; if(stopButton!=null) stopButton.Visibility=width>=480 ? Visibility.Visible : Visibility.Collapsed; more.Visibility=compact ? Visibility.Collapsed : Visibility.Visible; UpdatePlaybackControls(); };
+        playerOverlay.LayoutChanged+=(width,compact)=> {
+            compactVideoControls=compact;
+            transportCard.Padding=new Thickness(compact ? 4 : 6); overlayContent.Spacing=compact ? 2 : 4;
+            foreach(var button in transport.Children.Concat(tools.Children).OfType<Button>())
+            {
+                var size=ReferenceEquals(button,primaryTransport) ? compact ? 28 : 32 : compact ? 26 : 30;
+                button.MinHeight=button.Height=button.Width=size; button.MinWidth=0; button.Padding=new Thickness(0); button.FontSize=11;
+                button.CornerRadius=new CornerRadius(ReferenceEquals(button,primaryTransport) ? size/2 : 6);
+                if(button.Content is FontIcon icon) icon.FontSize=compact ? 12 : 14;
+                if(!ReferenceEquals(button,primaryTransport)) button.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            }
+            goLive.MinHeight=goLive.Height=compact ? 18 : 20; goLive.FontSize=10; goLive.Padding=new Thickness(5,0,5,0); goLive.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            livePositionLabel.FontSize=10; livePositionLabel.MaxWidth=230; livePositionLabel.TextWrapping=TextWrapping.NoWrap; livePositionLabel.TextTrimming=TextTrimming.CharacterEllipsis;
+            elapsedLabel.FontSize=durationLabel.FontSize=10;
+            progressArea.Width=Math.Min(compact ? 340 : 560,width-12);
+            infoHeading.Visibility=compact ? Visibility.Collapsed : Visibility.Visible; infoHeading.FontSize=9; infoContent.Spacing=3;
+            streamInfo.FontSize=compact ? 9.5 : 10.5; streamInfo.MaxLines=compact ? 2 : 0; streamInfo.LineHeight=compact ? 12 : 15; streamInfo.MaxWidth=compact ? 150 : 230;
+            infoCard.Padding=new Thickness(compact ? 5 : 7);
+            if(volumeControl!=null) { volumeControl.MinHeight=volumeControl.Height=24; volumeControl.Width=64; volumeControl.Visibility=width>=760 ? Visibility.Visible : Visibility.Collapsed; }
+            if(expandButton!=null) expandButton.Visibility=width>=580 ? Visibility.Visible : Visibility.Collapsed;
+            if(favoriteButton!=null) favoriteButton.Visibility=width>=520 ? Visibility.Visible : Visibility.Collapsed;
+            if(stopButton!=null) stopButton.Visibility=width>=480 ? Visibility.Visible : Visibility.Collapsed;
+            more.Visibility=compact ? Visibility.Collapsed : Visibility.Visible; UpdatePlaybackControls();
+        };
         playerOverlay.VisibilityChanged+=visible=>surface?.Player?.Set("sub-pos",(visible ? Math.Min(75,settings.Playback.SubtitlePosition) : settings.Playback.SubtitlePosition).ToString());
         Place(livePage,stage,1,2); pageHost.Children.Add(livePage); UpdateLiveLayout();
         transportTimer.Tick+=(_,_)=>UpdatePlaybackControls(); transportTimer.Start();
@@ -232,7 +258,7 @@ public sealed partial class MainWindow
         {
             var source=settings.Profile.Sources.FirstOrDefault(s=>s.Id==row.Item.SourceId); var id=source?.EpgMappings.GetValueOrDefault(row.Item.Id,row.Item.EpgId=="" ? row.Item.Id : row.Item.EpgId)??row.Item.EpgId;
             var pair=GuideFor(row.Item.SourceId).NowNext(id,now);
-            row.NowNext=pair.Now==null ? "No programme information" : $"{pair.Now.Title}  ·  Next: {pair.Next?.Title??"—"}";
+            row.NowNext=pair.Now==null ? "No program information" : $"{pair.Now.Title}  ·  Next: {pair.Next?.Title??"—"}";
         }
     }
     private static Image? FindImage(DependencyObject? obj) { if(obj==null) return null; if(obj is Image image) return image; for(int i=0;i<Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(obj);i++) { var result=FindImage(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(obj,i)); if(result!=null) return result; } return null; }

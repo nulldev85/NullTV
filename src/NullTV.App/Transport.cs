@@ -7,7 +7,7 @@ public sealed partial class MainWindow
     private sealed class ChannelRow(MediaItem item) : ArtworkRow(item)
     {
         public string DisplayName=>$"{Item.Number:000}  {Item.Name}";
-        private string nowNext="No programme information";
+        private string nowNext="No program information";
         public string NowNext { get=>nowNext; set { if(nowNext==value) return; nowNext=value; Changed(nameof(NowNext)); } }
         private bool favorite;
         public bool IsFavorite { get=>favorite; set { if(favorite==value) return; favorite=value; Changed(nameof(FavoriteGlyph)); Changed(nameof(FavoriteLabel)); Changed(nameof(FavoriteBrush)); } }
@@ -45,7 +45,6 @@ public sealed partial class MainWindow
     {
         if(primaryTransport==null || closed) return;
         var item=playing??lastPlayed; var state=surface?.Player?.State; var running=playing!=null && state?.Idle==false; var live=item?.Kind==MediaKind.Live;
-        if(guideFullscreenButton!=null) guideFullscreenButton.IsEnabled=playing?.Kind==MediaKind.Live && running;
         LabelButton(primaryTransport,running && !state!.Paused ? "\uE769" : "\uE768",running && !state!.Paused ? "Pause" : "Play");
         primaryTransport.IsEnabled=item!=null;
         if(stopButton!=null) stopButton.IsEnabled=running;

@@ -32,9 +32,9 @@ public sealed class SourceService(HttpClient http, SettingsStore store)
     }
     public async Task VerifyCatchupAsync(Source s,MediaItem item,Programme p,CancellationToken ct=default)
     {
-        if(s.Kind==SourceKind.Xtream) { var listing=await new XtreamClient(http).EpgAsync(s,item,true,ct); if(!listing.Any(x=>Math.Abs((x.Start-p.Start).TotalMinutes)<1)) throw new InvalidDataException("The provider's archive response does not confirm this programme."); }
+        if(s.Kind==SourceKind.Xtream) { var listing=await new XtreamClient(http).EpgAsync(s,item,true,ct); if(!listing.Any(x=>Math.Abs((x.Start-p.Start).TotalMinutes)<1)) throw new InvalidDataException("The provider's archive response does not confirm this program."); }
         var url=XtreamClient.CatchupUrl(s,item,p); using var request=new HttpRequestMessage(HttpMethod.Get,url); request.Headers.Range=new(0,1023);
         foreach(var h in item.Headers) request.Headers.TryAddWithoutValidation(h.Key,h.Value);
-        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct); if(!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType is "text/html" or "application/json") throw new InvalidDataException("The provider did not return an archived media stream for this programme.");
+        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct); if(!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType is "text/html" or "application/json") throw new InvalidDataException("The provider did not return an archived media stream for this program.");
     }
 }

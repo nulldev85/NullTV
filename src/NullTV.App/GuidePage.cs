@@ -12,7 +12,6 @@ public sealed partial class MainWindow
     private Border? guidePreview,guideVideoExpanded;
     private Border? guideEmpty;
     private bool guideHasRows;
-    private Button? guideFullscreenButton;
     private Action<MediaItem>? selectGuideChannel;
     private void MoveVideo(Border? destination)
     {
@@ -46,7 +45,7 @@ public sealed partial class MainWindow
     private static string ProgrammeMeta(Programme show)=>string.Join(" · ",new[]{show.Category,show.Rating,show.Episode,show.IsPremiere ? "PREMIERE" : show.IsNew ? "NEW" : show.IsRepeat ? "REPEAT" : ""}.Where(value=>value!=""));
     private async Task AddReminderAsync(MediaItem channel,Programme show)
     {
-        if(show.Start<=DateTimeOffset.UtcNow) throw new InvalidDataException("Reminders can be set for upcoming programmes.");
+        if(show.Start<=DateTimeOffset.UtcNow) throw new InvalidDataException("Reminders can be set for upcoming programs.");
         if(!settings.Profile.Reminders.Any(reminder=>reminder.ChannelId==channel.Id && reminder.Start==show.Start)) settings.Profile.Reminders.Add(new(channel.Id,show.Title,show.Start));
         await store.SaveAsync(settings); status.Text="Reminder saved. NullTV must remain open for reminders.";
     }
@@ -64,17 +63,14 @@ public sealed partial class MainWindow
         var preview=guidePreview;
         preview.SizeChanged+=(_,_)=> { var height=Math.Max(160,preview.ActualWidth*9/16); if(Math.Abs(preview.Height-height)>.5 || double.IsNaN(preview.Height)) preview.Height=height; };
         Place(info,guidePreview);
-        var infoContext=Text("SELECT A PROGRAMME",10); infoContext.CharacterSpacing=100;
+        var infoContext=Text("SELECT A PROGRAM",10); infoContext.CharacterSpacing=100;
         var infoTitle=Text("What is on. What is next.",21); infoTitle.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; infoTitle.TextWrapping=TextWrapping.NoWrap; infoTitle.TextTrimming=TextTrimming.CharacterEllipsis;
         var infoMeta=Text("",11); infoMeta.Foreground=new SolidColorBrush(Color(LightFields ? "#815CD6" : "#BD93F9"));
-        var infoDescription=Text("Browse schedules, read programme details and watch your favorite channels.",12); infoDescription.Opacity=.7; infoDescription.MaxLines=2; infoDescription.TextTrimming=TextTrimming.CharacterEllipsis;
+        var infoDescription=Text("Browse schedules, read program details and watch your favorite channels.",12); infoDescription.Opacity=.7; infoDescription.TextTrimming=TextTrimming.CharacterEllipsis;
         var copy=Stack(infoContext,infoTitle,infoMeta,infoDescription); copy.Spacing=7;
-        var infoDetails=new Grid { RowSpacing=12 }; infoDetails.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); infoDetails.RowDefinitions.Add(new() { Height=GridLength.Auto }); Place(infoDetails,copy); Place(info,infoDetails,0,1);
-        var full=Button("Fullscreen",()=> { if(playing?.Kind==MediaKind.Live) ToggleFullscreen(); });
-        guideFullscreenButton=full;
-        full.IsEnabled=playing?.Kind==MediaKind.Live;
-        var details=AsyncButton("Full details",()=>selectedChannel==null || selectedShow==null ? Task.CompletedTask : ProgrammeDetailsAsync(selectedChannel,selectedShow)); details.IsEnabled=false;
-        var infoActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 }; infoActions.Children.Add(details); infoActions.Children.Add(full); Place(infoDetails,infoActions,1);
+        var infoDetails=new Grid(); Place(infoDetails,copy); Place(info,infoDetails,0,1);
+        // Keep the summary within the preview's height without a redundant action row.
+        preview.SizeChanged+=(_,_)=>infoDescription.MaxLines=Math.Max(2,(int)((preview.ActualHeight-92)/17));
         var infoCard=Card(info,new Thickness(18,14,18,14)); Place(page,infoCard,1);
         void UpdateInfo()
         {
@@ -87,7 +83,6 @@ public sealed partial class MainWindow
             infoTitle.Text=show.Title+(show.Subtitle=="" ? "" : " — "+show.Subtitle);
             infoMeta.Text=ProgrammeMeta(show); infoMeta.Visibility=infoMeta.Text=="" ? Visibility.Collapsed : Visibility.Visible;
             infoDescription.Text=show.Description=="" ? "No description supplied by the provider." : show.Description;
-            details.IsEnabled=true; full.IsEnabled=playing?.Kind==MediaKind.Live;
         }
         void SelectProgramme(MediaItem channel,Programme show) { selectedChannel=channel; selectedShow=show; UpdateInfo(); }
         selectGuideChannel=channel=> {
@@ -95,14 +90,13 @@ public sealed partial class MainWindow
             var id=profile.Sources.FirstOrDefault(s=>s.Id==channel.SourceId)?.EpgMappings.GetValueOrDefault(channel.Id,channel.EpgId=="" ? channel.Id : channel.EpgId)??channel.EpgId;
             selectedShow=GuideFor(channel.SourceId).NowNext(id,DateTimeOffset.Now).Now;
             if(selectedShow!=null) UpdateInfo();
-            else { infoContext.Text=$"LIVE CHANNEL  ·  {channel.Number:000}  {channel.Name}"; infoTitle.Text=channel.Name; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Programme information is unavailable. Live playback is still available here."; details.IsEnabled=false; }
-            full.IsEnabled=true;
+            else { infoContext.Text=$"LIVE CHANNEL  ·  {channel.Number:000}  {channel.Name}"; infoTitle.Text=channel.Name; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Program information is unavailable. Live playback is still available here."; }
         };
-        var search=SearchBox("Search favorites or programmes"); search.Width=280;
+        var search=SearchBox("Search favorites or programs"); search.Width=280;
         var controls=new Grid { ColumnSpacing=16 }; controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); controls.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var timeActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6 };
         timeActions.Children.Add(IconButton("\uE76B","Previous two hours",()=> { guideStart=guideStart.AddHours(-2); refreshGuide?.Invoke(); }));
-        timeActions.Children.Add(Button("Now",()=> { guideStart=HalfHour(DateTimeOffset.Now); refreshGuide?.Invoke(); }));
+        var now=Button("Now",()=> { guideStart=HalfHour(DateTimeOffset.Now); refreshGuide?.Invoke(); }); now.Foreground=new SolidColorBrush(Color(LightFields ? "#A39514" : "#F1FA8C")); timeActions.Children.Add(now);
         timeActions.Children.Add(IconButton("\uE76C","Next two hours",()=> { guideStart=guideStart.AddHours(2); refreshGuide?.Invoke(); })); Place(controls,timeActions);
         var date=Text(guideStart.LocalDateTime.ToString("ddd, dd MMM  ·  HH:mm")+"  ·  Local time",12); date.VerticalAlignment=VerticalAlignment.Center; Place(controls,date,0,1); Place(controls,search,0,2); Place(page,Card(controls,new Thickness(8)),2);
         var rows=new ObservableCollection<GuideRow>();
@@ -170,7 +164,7 @@ public sealed partial class MainWindow
                 var state=Text("",10); state.TextWrapping=TextWrapping.NoWrap; state.TextTrimming=TextTrimming.CharacterEllipsis;
                 var progress=new ProgressBar { Minimum=0,Maximum=100,Height=2,MinHeight=2,Foreground=new SolidColorBrush(Color("#50FA7B")),Background=new SolidColorBrush(Color("#44475A")),Margin=new Thickness(0,3,0,0) };
                 var content=Stack(title,time,state,progress); content.Spacing=4;
-                var cell=Button("",()=>SelectProgramme(row.Channel,show)); cell.Content=content; cell.MinHeight=cell.MaxHeight=80; cell.MinWidth=0; cell.Margin=new Thickness(2,0,2,0); cell.HorizontalAlignment=HorizontalAlignment.Stretch; cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.Background=new SolidColorBrush(Color(LightFields ? "#F1F2F4" : "#282A36")); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(8);
+                var cell=Button("",()=> { SelectProgramme(row.Channel,show); if(show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now) _=GuardAsync(()=>PlayAsync(row.Channel)); }); cell.Content=content; cell.MinHeight=cell.MaxHeight=80; cell.MinWidth=0; cell.Margin=new Thickness(2,0,2,0); cell.HorizontalAlignment=HorizontalAlignment.Stretch; cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.Background=new SolidColorBrush(Color(LightFields ? "#F1F2F4" : "#282A36")); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(8);
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(cell,show.Title+", "+show.TimeLabel); ToolTipService.SetToolTip(cell,show.Title+" · "+show.TimeLabel);
                 Action update=()=> {
                     var current=show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start;
@@ -180,7 +174,6 @@ public sealed partial class MainWindow
                     cell.BorderThickness=new Thickness(selected ? 1 : 0); cell.BorderBrush=new SolidColorBrush(Color("#BD93F9"));
                 };
                 update(); updates.Add(update); cell.Click+=(_,_)=> { foreach(var updateVisible in timeUpdates.Values) updateVisible(); };
-                cell.DoubleTapped+=(_,args)=> { args.Handled=true; _=GuardAsync(()=>PlayAsync(row.Channel)); };
                 var segment=new Grid(); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,start),GridUnitType.Star) }); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,end-start),GridUnitType.Star) }); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,120-end),GridUnitType.Star) }); Place(segment,cell,0,1); timeline.Children.Add(segment);
             }
             timeUpdates[grid]=()=> { foreach(var update in updates) update(); }; Place(grid,timeline,0,1);
@@ -208,9 +201,9 @@ public sealed partial class MainWindow
                     var first=available.FirstOrDefault(pair=>pair.Show.Start<=DateTimeOffset.Now && pair.Show.End>DateTimeOffset.Now);
                     if(first.Show==null) first=available.FirstOrDefault();
                     if(first.Show!=null) SelectProgramme(first.Channel,first.Show);
-                    else if(found.Count>0) { selectedChannel=found[0].Channel; infoContext.Text=$"CHANNEL  ·  {selectedChannel.Number:000}  {selectedChannel.Name}"; infoContext.Foreground=FieldText(); infoTitle.Text="Schedule unavailable"; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Click the channel name to preview it here. Your favorite stays in the guide while programme information is unavailable."; details.IsEnabled=false; }
+                    else if(found.Count>0) { selectedChannel=found[0].Channel; infoContext.Text=$"CHANNEL  ·  {selectedChannel.Number:000}  {selectedChannel.Name}"; infoContext.Foreground=FieldText(); infoTitle.Text="Schedule unavailable"; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Click the channel name to preview it here. Your favorite stays in the guide while program information is unavailable."; }
                 }
-                if(term!="" && rows.Count==0) empty.Child=EmptyState("\uE721","No matching favorites or programmes.","Try a channel name, a programme title, or a different time.","Clear search",()=> { search.Text=""; return Task.CompletedTask; });
+                if(term!="" && rows.Count==0) empty.Child=EmptyState("\uE721","No matching favorites or programs.","Try a channel name, a program title, or a different time.","Clear search",()=> { search.Text=""; return Task.CompletedTask; });
                 else if(channelSnapshot.Length==0) empty.Child=EmptyState("\uE735","Build your favorite guide.","Star channels in Live TV and they will appear here, ready to arrange.","Choose favorite channels",()=> { Navigate("Live TV"); return Task.CompletedTask; });
             }
             catch(OperationCanceledException) { }
@@ -229,7 +222,7 @@ public sealed partial class MainWindow
         var content=Stack(Text(channel.Name,12),Text(show.Title,22),Text(show.Subtitle,14),Text($"{show.Start.LocalDateTime:ddd, dd MMM} · {show.TimeLabel} · {duration} min",13),Text(ProgrammeMeta(show),12),Text(show.Description=="" ? "No description supplied by the provider." : show.Description,14));
         if(show.Start>DateTimeOffset.UtcNow) { var reminder=AsyncButton("Set reminder",()=>AddReminderAsync(channel,show)); reminder.Foreground=new SolidColorBrush(Color("#F1FA8C")); content.Children.Add(reminder); }
         var past=show.End<DateTimeOffset.UtcNow; var catchup=past && channel.ArchiveDays>0 && show.Start>=DateTimeOffset.UtcNow.AddDays(-channel.ArchiveDays);
-        var result=await DialogAsync("Programme details",Scroll(content),catchup ? "Play catch-up" : "Watch channel"); if(result!=ContentDialogResult.Primary) return;
+        var result=await DialogAsync("Program details",Scroll(content),catchup ? "Play catch-up" : "Watch channel"); if(result!=ContentDialogResult.Primary) return;
         if(catchup) { var source=settings.Profile.Sources.First(s=>s.Id==channel.SourceId); await new SourceService(http,store).VerifyCatchupAsync(source,channel,show,lifetime.Token); var url=XtreamClient.CatchupUrl(source,channel,show); await PlayAsync(channel with { Url=url,Kind=MediaKind.Episode,Id=channel.Id+":"+show.Start.ToUnixTimeSeconds(),Name=show.Title }); }
         else await PlayAsync(channel);
     }

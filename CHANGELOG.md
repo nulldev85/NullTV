@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 — 2026-10-12
+
+- Reduced video overlay button, text and padding sizes. Controls now form a centered panel fitted to their contents; stream information also sizes to its text. Both use translucent Dracula surfaces over a transparent composition backdrop, with hover visibility retained.
+- A single click on a currently airing Guide program starts its channel in the Guide preview. Upcoming/past cells retain program details; removed the old double-tap playback handler.
+- Changed user-facing "programme/programmes" wording to "program/programs", including search, status, details, reminders and archive errors. XMLTV schema names and saved data models remain compatible.
+- Playback position and volume use thin Dracula green tracks and slim markers while retaining native slider hit areas, dragging and keyboard input. The LIVE action has a matching green bar.
+- Added small yellow accents to Guide's Now label and the stream information heading. Removed Full details and Fullscreen beside the Guide preview and gave its program summary the available height; fullscreen remains in the video controls.
+
 ## 0.4.1 — 2026-10-12
 
 - Clicking a Guide channel starts a native preview beside the programme information, within Guide. Removed the separate row play icons and Play channel menu action.
