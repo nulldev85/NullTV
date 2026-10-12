@@ -2,6 +2,11 @@
 <ResourceDictionary.MergedDictionaries><XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/></ResourceDictionary.MergedDictionaries>
 <ResourceDictionary.ThemeDictionaries>
 <ResourceDictionary x:Key="Default">
+<Color x:Key="SystemAccentColor">#BD93F9</Color>
+<SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#F8F8F2"/><SolidColorBrush x:Key="FocusVisualPrimaryBrush" Color="#815CD6"/>
+<SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#BD93F9"/><SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#BD93F9"/><SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#BD93F9"/>
+<SolidColorBrush x:Key="SliderTrackValueFill" Color="#BD93F9"/><SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#BD93F9"/><SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#BD93F9"/>
+<SolidColorBrush x:Key="SliderThumbBackground" Color="#BD93F9"/><SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#BD93F9"/><SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#BD93F9"/>
 <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#21222C"/><SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="#BD93F9"/><SolidColorBrush x:Key="ComboBoxDropDownForeground" Color="#F8F8F2"/><SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#44475A"/>
 <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedUnfocused" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelectedPointerOver" Color="Transparent"/>
 

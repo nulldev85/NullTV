@@ -74,8 +74,8 @@ public sealed partial class MainWindow : Window
         Content=root;
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1440,960));
         AppWindow.Changed+=(_,_)=> { foreach(var tile in surfaces) tile.Hide(!IsPlayerVisible || !AppWindow.IsVisible || dialogDepth>0 || !active.ContainsKey(tile)); };
-        Closed+=(_,_)=> { closed=true; lifetime.Cancel(); timer.Stop(); transportTimer.Stop(); filterPending?.Cancel(); foreach(var s in surfaces) s.Dispose(); pipWindow?.Close(); _=store.SaveAsync(settings); http.Dispose(); };
-        AppWindow.Closing+=async (_,e)=> { if(closingConfirmed) return; e.Cancel=true; timer.Stop(); await GuardAsync(SaveProgressAsync); closingConfirmed=true; Close(); };
+        Closed+=(_,_)=> { closed=true; lifetime.Cancel(); timer.Stop(); transportTimer.Stop(); filterPending?.Cancel(); playerOverlay?.Dispose(); foreach(var s in surfaces) s.Dispose(); pipWindow?.Close(); _=store.SaveAsync(settings); http.Dispose(); };
+        AppWindow.Closing+=async (_,e)=> { if(closingConfirmed) { playerOverlay?.Dispose(); return; } e.Cancel=true; timer.Stop(); await GuardAsync(SaveProgressAsync); closingConfirmed=true; Close(); };
         root.Loaded+=async (_,_)=>await GuardAsync(InitializeAsync);
         timer.Tick+=async (_,_)=>await TickAsync();
     }
@@ -157,7 +157,7 @@ public sealed partial class MainWindow : Window
     private ScrollViewer Scroll(UIElement element) => new() { Content=element,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
     private void Navigate(string tab,bool nowPlaying=false)
     {
-        currentTab=tab; libraryNowPlaying=tab=="Movies & Series" && nowPlaying; foreach(var s in surfaces) s.Hide(!IsPlayerVisible);
+        currentTab=tab; libraryNowPlaying=tab=="Movies & Series" && nowPlaying; playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible);
         foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .65; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); }
         foreach(var child in pageHost.Children) child.Visibility=Visibility.Collapsed;
         if(IsPlayerVisible) { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!active.ContainsKey(s)); UpdateLiveLayout(); return; }
@@ -191,7 +191,6 @@ public sealed partial class MainWindow : Window
         ticks++; PollController();
         if(surface?.Player!=null && playing!=null && ticks%5==0) await GuardAsync(SaveProgressAsync);
         if(ticks%15==0 && playing!=null) _=GuardAsync(SyncServerProgressAsync);
-        if(fullscreen && playerControls!=null) playerControls.Visibility=DateTimeOffset.UtcNow-lastInput>TimeSpan.FromSeconds(4) ? Visibility.Collapsed : Visibility.Visible;
         if(ticks%60==0)
         {
             if(PowerManager.EnergySaverStatus!=EnergySaverStatus.On && !busy) _=GuardAsync(()=>RefreshAllAsync(false));
@@ -203,7 +202,7 @@ public sealed partial class MainWindow : Window
     }
     private async Task<ContentDialogResult> DialogAsync(string title,UIElement content,string primary="Save")
     {
-        dialogDepth++; foreach(var s in surfaces) s.Hide(true);
+        dialogDepth++; playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(true);
         try
         {
             var primaryStyle=new Style(typeof(Button)) { BasedOn=(Style)Application.Current.Resources["NullTVButtonStyle"] }; primaryStyle.Setters.Add(new Setter(Control.BackgroundProperty,new SolidColorBrush(Color(settings.Appearance.Accent)))); primaryStyle.Setters.Add(new Setter(Control.ForegroundProperty,new SolidColorBrush(Color("#0A0A0A")))); primaryStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty,44d));

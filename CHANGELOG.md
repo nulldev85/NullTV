@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-10-12
+
+- Added explicit channel play actions and programme double-tap playback to the favorite Guide. Removed the vertical time marker and retained each current programme's progress bar.
+- Moved transport and seeking into native child XAML overlays above the video. Controls and the upper-right stream panel appear on video hover and hide on exit; keyboard/touch support remains available.
+- Added VOD/media-server rewind/forward 10 seconds, timeline seeking, observed Play/Pause and a separate Stop action. Live supports pause and a LIVE action that reopens the current feed without a VOD start override.
+- Added a visible CC control: Off, Automatic, embedded subtitle/closed-caption tracks and external subtitle files. Subtitles rise above visible controls and return to the preferred position when controls hide. Captions default to off; enabling/disabling persists and applies to channel changes. Secondary caption tracks are also disabled by Off.
+- Stream information shows actual quality/resolution, codec/frame rate, hardware decode, audio codec/channels/sample rate, dropped frames and buffer duration.
+
+
 ## 0.3.1 — 2026-10-12
 
 - Corrected the default to full Dracula Classic: #282A36 app background, #21222C surfaces and #343746 raised controls. Removed the black-background OLED variant.

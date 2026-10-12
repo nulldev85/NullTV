@@ -32,7 +32,8 @@ public sealed partial class MainWindow
         if(playing==null) { if(lastPlayed!=null) _=GuardAsync(()=>PlayAsync(lastPlayed)); return; }
         if(surface?.Player is not { } player) return;
         if(player.State.Idle) { _=GuardAsync(()=>PlayAsync(playing)); return; }
-        if(playing.Kind==MediaKind.Live) StopPlayback(); else player.Command("cycle","pause");
+        player.Command("cycle","pause");
+        playerOverlay?.Reveal();
     }
     private static void LabelButton(Button? button,string glyph,string label)
     {
@@ -44,11 +45,17 @@ public sealed partial class MainWindow
     {
         if(primaryTransport==null || closed) return;
         var item=playing??lastPlayed; var state=surface?.Player?.State; var running=playing!=null && state?.Idle==false; var live=item?.Kind==MediaKind.Live;
-        LabelButton(primaryTransport,running ? live ? "\uE71A" : state!.Paused ? "\uE768" : "\uE769" : "\uE768",running ? live ? "Stop live playback" : state!.Paused ? "Play" : "Pause" : "Play");
+        LabelButton(primaryTransport,running && !state!.Paused ? "\uE769" : "\uE768",running && !state!.Paused ? "Pause" : "Play");
         primaryTransport.IsEnabled=item!=null;
-        if(stopButton!=null) { stopButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; stopButton.IsEnabled=running; }
+        if(stopButton!=null) stopButton.IsEnabled=running;
         if(previousButton!=null) previousButton.Visibility=item?.Kind==MediaKind.Live ? Visibility.Visible : Visibility.Collapsed;
         if(nextButton!=null) nextButton.Visibility=item?.Kind==MediaKind.Live ? Visibility.Visible : Visibility.Collapsed;
+        if(rewindButton!=null) { rewindButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; rewindButton.IsEnabled=running && state?.Duration>0; }
+        if(forwardButton!=null) { forwardButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; forwardButton.IsEnabled=running && state?.Duration>0; }
+        if(liveBar!=null) liveBar.Visibility=playing!=null && live ? Visibility.Visible : Visibility.Collapsed;
+        if(live && running && state!.Paused) behindLive=true;
+        if(livePositionLabel!=null) { livePositionLabel.Text=state?.Paused==true ? "Paused · Select LIVE to return" : behindLive ? "Behind live · Select LIVE to return" : state?.Buffering==true ? "Buffering live feed…" : "Watching live"; livePositionLabel.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(behindLive ? "#F1FA8C" : "#F8F8F2")); }
+        if(subtitlesButton!=null) { subtitlesButton.IsEnabled=running; subtitlesButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(state?.SubtitlesVisible==true && state.SubtitleId is not ("no" or "") ? "#BD93F9" : "#F8F8F2")); }
         var favorite=item!=null && settings.Profile.Favorites.Contains(item.Id); LabelButton(favoriteButton,favorite ? "\uE735" : "\uE734",favorite ? "Remove from favorites" : "Add to favorites"); if(favoriteButton!=null) { favoriteButton.IsEnabled=item!=null; favoriteButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? "#F1FA8C" : "#F8F8F2")); }
         LabelButton(muteButton,state?.Muted==true ? "\uE74F" : "\uE767",state?.Muted==true ? "Unmute" : "Mute");
         if(progressArea!=null) progressArea.Visibility=playing!=null && !live && state?.Duration>0 ? Visibility.Visible : Visibility.Collapsed;
@@ -59,6 +66,42 @@ public sealed partial class MainWindow
             finally { updatingTransport=false; }
             if(elapsedLabel!=null) elapsedLabel.Text=TimeCode(state.Position); if(durationLabel!=null) durationLabel.Text=TimeCode(state.Duration);
         }
+        if(playerOverlay?.IsVisible==true && infoTask?.IsCompleted!=false && DateTimeOffset.UtcNow-infoUpdated>TimeSpan.FromSeconds(2)) infoTask=GuardAsync(UpdateStreamInfoAsync);
+    }
+    private void SeekRelative(int seconds)
+    {
+        if(playing?.Kind==MediaKind.Live || surface?.Player is not { } player || player.State.Idle || player.State.Duration<=0) return;
+        var target=Math.Clamp(player.State.Position+seconds,0,Math.Max(0,player.State.Duration-.1));
+        player.Command("seek",target.ToString(System.Globalization.CultureInfo.InvariantCulture),"absolute+exact"); playerOverlay?.Reveal();
+    }
+    private async Task GoLiveAsync()
+    {
+        if(playing is not { Kind:MediaKind.Live } channel) return;
+        await PlayAsync(channel); behindLive=false; UpdatePlaybackControls();
+    }
+    private async Task UpdateStreamInfoAsync()
+    {
+        infoUpdated=DateTimeOffset.UtcNow; var player=surface?.Player; var itemId=playing?.Id; var generation=surface==null ? 0 : generations.GetValueOrDefault(surface); if(player==null) return;
+        var details=await Task.Run(player.StreamDetails);
+        if(!closed && ReferenceEquals(surface?.Player,player) && playing?.Id==itemId && surface!=null && generations.GetValueOrDefault(surface)==generation && streamInfo!=null) streamInfo.Text=details;
+    }
+    private async Task SubtitlesMenuAsync()
+    {
+        var player=surface?.Player; if(player==null || playing==null || dialogDepth>0) return;
+        var trackSnapshot=await Task.Run(player.Tracks); if(!ReferenceEquals(surface?.Player,player)) return;
+        var subtitles=trackSnapshot.Where(track=>track.Type=="sub").ToArray();
+        var selected=!player.State.SubtitlesVisible || player.State.SubtitleId is "no" or "" ? "Off" : subtitles.FirstOrDefault(track=>track.Id==player.State.SubtitleId) is var track && track.Id!=null ? $"{track.Id}: {track.Name.Trim()}" : "Automatic";
+        var choice=Choice("Subtitles and closed captions",new[]{"Off","Automatic"}.Concat(subtitles.Select(track=>$"{track.Id}: {track.Name.Trim()}")),selected);
+        var content=Stack(choice,Text("Off disables subtitle and closed-caption tracks. Automatic follows your preferred subtitle language.",12));
+        content.Children.Add(AsyncButton("Load subtitle file…",async ()=> {
+            var path=await OpenFileAsync(".srt",".ass",".ssa",".vtt",".sub"); if(path==null || !ReferenceEquals(surface?.Player,player)) return;
+            await player.AddSubtitleAsync(path,lifetime.Token); settings.Playback.SubtitlesEnabled=true; await store.SaveAsync(settings);
+            var tracks=await Task.Run(player.Tracks); var selectedId=await Task.Run(()=>player.Get("sid")); foreach(var added in tracks.Where(t=>t.Type=="sub")) { var label=$"{added.Id}: {added.Name.Trim()}"; if(!choice.Items.Contains(label)) choice.Items.Add(label); if(selectedId==added.Id) choice.SelectedItem=label; }
+            status.Text="Subtitle file loaded.";
+        }));
+        if(await DialogAsync("Subtitles & captions",content,"Apply")!=ContentDialogResult.Primary || !ReferenceEquals(surface?.Player,player)) return;
+        var value=(string)choice.SelectedItem; var id=value=="Off" ? "no" : value=="Automatic" ? "auto" : value.Split(':')[0];
+        await player.SetSubtitleAsync(id,lifetime.Token); settings.Playback.SubtitlesEnabled=id!="no"; await store.SaveAsync(settings); playerOverlay?.Reveal(); UpdatePlaybackControls();
     }
     private static string TimeCode(double seconds) { var time=TimeSpan.FromSeconds(Math.Max(0,seconds)); return time.TotalHours>=1 ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}" : $"{(int)time.TotalMinutes}:{time.Seconds:00}"; }
     private async Task ToggleFavoriteAsync(MediaItem item)

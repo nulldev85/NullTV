@@ -21,7 +21,7 @@ public sealed class MpvPlayer : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct Event { public int Id,Error; public ulong Reply; public IntPtr Data; }
     [StructLayout(LayoutKind.Sequential)] private struct End { public int Reason,Error; public long Entry; public long Insert; public int Count; }
     [StructLayout(LayoutKind.Sequential)] private struct Property { public IntPtr Name; public int Format; public IntPtr Data; }
-    public sealed record PlaybackState(bool Paused=false,bool Idle=true,bool Buffering=false,bool Muted=false,double Position=0,double Duration=0,double Volume=75);
+    public sealed record PlaybackState(bool Paused=false,bool Idle=true,bool Buffering=false,bool Muted=false,double Position=0,double Duration=0,double Volume=75,bool SubtitlesVisible=false,string SubtitleId="no");
     private volatile PlaybackState state=new();
     public PlaybackState State=>state;
     public event Action? StateChanged;
@@ -30,11 +30,13 @@ public sealed class MpvPlayer : IDisposable
     private readonly CancellationTokenSource lifetime=new();
     private readonly Task events;
     private long nextRequest;
+    private readonly PlaybackSettings preferences;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<ulong,TaskCompletionSource<int>> replies=new();
     public event Action<bool>? Ended;
     public event Action? Loaded;
     public MpvPlayer(IntPtr hwnd, PlaybackSettings settings)
     {
+        preferences=settings;
         handle=mpv_create(); if(handle==IntPtr.Zero) throw new InvalidOperationException("libmpv could not create a player.");
         try
         {
@@ -45,12 +47,15 @@ public sealed class MpvPlayer : IDisposable
             Option("cache","yes"); Option("demuxer-max-bytes",$"{settings.BufferMiB}MiB"); Option("demuxer-readahead-secs",settings.LowLatency ? "1" : settings.CacheSeconds.ToString());
             Option("cache-pause",settings.LowLatency ? "no" : "yes"); Option("network-timeout","15");
             Option("volume",settings.Volume.ToString()); Option("alang",settings.AudioLanguage); Option("slang",settings.SubtitleLanguage); Option("audio-device",settings.AudioDevice);
+            Option("sid",settings.SubtitlesEnabled ? "auto" : "no"); Option("secondary-sid","no");
+            Option("sub-visibility",settings.SubtitlesEnabled ? "yes" : "no"); Option("secondary-sub-visibility","no"); Option("sub-create-cc-track","yes");
             Option("audio-spdif",settings.Passthrough ? "ac3,eac3,dts,truehd" : ""); Option("deinterlace",settings.Deinterlace ? "yes" : "no");
             Option("sub-font",settings.SubtitleFont); Option("sub-font-size",settings.SubtitleSize.ToString()); Option("sub-color",settings.SubtitleColor); Option("sub-back-color",settings.SubtitleBackground); Option("sub-pos",settings.SubtitlePosition.ToString());
             Option("target-colorspace-hint",settings.Hdr ? "yes" : "no");
             if(settings.Aspect != "Default") Option("video-aspect-override",settings.Aspect);
             if(mpv_initialize(handle)<0) throw new InvalidOperationException("libmpv failed to initialize D3D11 playback.");
-            foreach(var name in new[]{"pause","idle-active","paused-for-cache","mute"}) mpv_observe_property(handle,0,name,3);
+            foreach(var name in new[]{"pause","idle-active","paused-for-cache","mute","sub-visibility"}) mpv_observe_property(handle,0,name,3);
+            mpv_observe_property(handle,0,"sid",1);
             foreach(var name in new[]{"time-pos","duration","volume"}) mpv_observe_property(handle,0,name,5);
             events=Task.Run(EventLoop);
         }
@@ -67,13 +72,14 @@ public sealed class MpvPlayer : IDisposable
     }
     public string Get(string name) { lock(gate) { if(handle==IntPtr.Zero) return ""; var p=mpv_get_property_string(handle,name); if(p==IntPtr.Zero) return ""; try { return Marshal.PtrToStringUTF8(p)??""; } finally { mpv_free(p); } } }
     public double Number(string name) => double.TryParse(Get(name),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var d) ? d : 0;
-    public void Command(params string[] args)
+    public void Command(params string[] args)=>QueueCommand(args,0);
+    private void QueueCommand(string[] args,ulong reply)
     {
         lock(gate)
         {
             if(handle==IntPtr.Zero) return;
             var ptrs=args.Select(Marshal.StringToCoTaskMemUTF8).ToArray(); var array=Marshal.AllocHGlobal((ptrs.Length+1)*IntPtr.Size);
-            try { for(int i=0;i<ptrs.Length;i++) Marshal.WriteIntPtr(array,i*IntPtr.Size,ptrs[i]); Marshal.WriteIntPtr(array,ptrs.Length*IntPtr.Size,IntPtr.Zero); if(mpv_command_async(handle,0,array)<0) throw new InvalidOperationException("Playback command failed."); }
+            try { for(int i=0;i<ptrs.Length;i++) Marshal.WriteIntPtr(array,i*IntPtr.Size,ptrs[i]); Marshal.WriteIntPtr(array,ptrs.Length*IntPtr.Size,IntPtr.Zero); if(mpv_command_async(handle,reply,array)<0) throw new InvalidOperationException("Playback command failed."); }
             finally { foreach(var p in ptrs) Marshal.FreeCoTaskMem(p); Marshal.FreeHGlobal(array); }
         }
     }
@@ -82,8 +88,26 @@ public sealed class MpvPlayer : IDisposable
         using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token,ct);
         var headers=string.Join(',',item.Headers.Where(h=>h.Key is "User-Agent" or "Referer").Select(h=>$"{h.Key}: {h.Value.Replace(",","%2C")}"));
         await SetAndWaitAsync("http-header-fields",headers,request.Token); await SetAndWaitAsync("pause","no",request.Token);
+        await SetSubtitleAsync(preferences.SubtitlesEnabled ? "auto" : "no",request.Token);
         request.Token.ThrowIfCancellationRequested();
-        Command("loadfile",item.Url,"replace","-1","start="+start.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // A live URL must use the demuxer's current live start, never a VOD
+        // start=0 override. Reopening it drops a paused/backlogged cache.
+        if(item.Kind==MediaKind.Live) Command("loadfile",item.Url,"replace");
+        else Command("loadfile",item.Url,"replace","-1","start="+start.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+    public async Task SetSubtitleAsync(string id,CancellationToken ct=default)
+    {
+        await SetAndWaitAsync("secondary-sid","no",ct);
+        await SetAndWaitAsync("secondary-sub-visibility","no",ct);
+        await SetAndWaitAsync("sub-visibility",id=="no" ? "no" : "yes",ct);
+        await SetAndWaitAsync("sid",id,ct);
+    }
+    public async Task AddSubtitleAsync(string path,CancellationToken ct=default)
+    {
+        await SetAndWaitAsync("sub-visibility","yes",ct);
+        var id=(ulong)Interlocked.Increment(ref nextRequest); var completion=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously); replies[id]=completion;
+        try { QueueCommand(["sub-add",path,"select"],id); if(await completion.Task.WaitAsync(TimeSpan.FromSeconds(15),ct)<0) throw new InvalidDataException("This subtitle file could not be loaded."); }
+        finally { replies.TryRemove(id,out _); }
     }
     private void EventLoop()
     {
@@ -93,18 +117,19 @@ public sealed class MpvPlayer : IDisposable
             // mpv_wait_event must never hold the UI command/property gate. The client API is thread-safe;
             // Dispose wakes and joins this loop before destroying its handle.
             var p=mpv_wait_event(handle,.25); e=Marshal.PtrToStructure<Event>(p); if(e.Id==7 && e.Data!=IntPtr.Zero) end=Marshal.PtrToStructure<End>(e.Data);
-            if(e.Id==4 && replies.TryRemove(e.Reply,out var completion)) completion.TrySetResult(e.Error);
+            if(e.Id is 4 or 5 && replies.TryRemove(e.Reply,out var completion)) completion.TrySetResult(e.Error);
             if(e.Id==22 && e.Data!=IntPtr.Zero)
             {
                 var property=Marshal.PtrToStructure<Property>(e.Data);
                 var propertyName=Marshal.PtrToStringUTF8(property.Name);
+                if(propertyName=="sid" && property.Format==1 && property.Data!=IntPtr.Zero) { state=state with { SubtitleId=Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(property.Data))??"no" }; StateChanged?.Invoke(); }
                 if(property.Format==0) state=propertyName switch { "time-pos"=>state with { Position=0 },"duration"=>state with { Duration=0 },_=>state };
                 if(property.Data!=IntPtr.Zero && property.Format is 3 or 5)
                 {
                     var name=Marshal.PtrToStringUTF8(property.Name); var flag=property.Format==3 && Marshal.ReadInt32(property.Data)!=0;
                     var number=property.Format==5 ? BitConverter.Int64BitsToDouble(Marshal.ReadInt64(property.Data)) : 0;
                     if(!double.IsFinite(number)) continue;
-                    var old=state; state=name switch { "pause"=>old with { Paused=flag },"idle-active"=>old with { Idle=flag },"paused-for-cache"=>old with { Buffering=flag },"mute"=>old with { Muted=flag },"time-pos"=>old with { Position=number },"duration"=>old with { Duration=number },"volume"=>old with { Volume=number },_=>old };
+                    var old=state; state=name switch { "pause"=>old with { Paused=flag },"idle-active"=>old with { Idle=flag },"paused-for-cache"=>old with { Buffering=flag },"mute"=>old with { Muted=flag },"sub-visibility"=>old with { SubtitlesVisible=flag },"time-pos"=>old with { Position=number },"duration"=>old with { Duration=number },"volume"=>old with { Volume=number },_=>old };
                     if(name is not ("time-pos" or "duration")) StateChanged?.Invoke();
                 }
             }
@@ -113,6 +138,17 @@ public sealed class MpvPlayer : IDisposable
         }
     }
     public string Stats() => $"Codec: {Get("video-codec")} · {Get("width")}×{Get("height")}\nDecode: {Get("hwdec-current")} · FPS: {Get("estimated-vf-fps")}\nVideo bitrate: {Number("video-bitrate")/1000:F0} kbps · Dropped: {Get("frame-drop-count")}\nAudio: {Get("audio-codec")} · Cache: {Number("demuxer-cache-duration"):F1} s";
+    public string StreamDetails()
+    {
+        var width=Number("width"); var height=Number("height"); if(width<=0 || height<=0) return "Waiting for stream information…";
+        var fps=Number("container-fps"); if(fps<=0) fps=Number("estimated-vf-fps");
+        var quality=height>=2160 ? "4K" : height>=1080 ? "1080p" : height>=720 ? "720p" : $"{height:0}p";
+        var transfer=Get("video-params/gamma"); var hdr=transfer is "pq" or "hlg" ? " · HDR" : "";
+        var decode=Get("hwdec-current"); var audio=Get("audio-codec-name"); var channels=Get("audio-params/hr-channels"); var rate=Number("audio-params/samplerate");
+        return $"{width:0} × {height:0} · {quality}{hdr}\n{Get("video-format").ToUpperInvariant()}"+(fps>0 ? $" · {fps:0.##} FPS" : "")+
+            $"\nDecode · {(decode is "" or "no" ? "Software" : decode.ToUpperInvariant())}\nAudio · {(audio=="" ? "Unavailable" : audio.ToUpperInvariant())}"+(channels!="" ? " · "+channels : "")+(rate>0 ? $" · {rate/1000:0.#} kHz" : "")+
+            $"\n{Number("frame-drop-count"):0} dropped frames · {Number("demuxer-cache-duration"):0.#}s buffer";
+    }
     public List<(string Id,string Name,string Type)> Tracks()
     {
         var result=new List<(string,string,string)>();

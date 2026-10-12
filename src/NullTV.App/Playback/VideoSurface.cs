@@ -27,21 +27,28 @@ public sealed class VideoSurface : UserControl, IDisposable
     private (int X,int Y,int W,int H) bounds;
     public MpvPlayer? Player { get; private set; }
     public event Action? Activity;
+    public event Action? Pressed;
     public event Action<int>? Swipe;
     public event Action? Initialized;
     public VideoSurface(Window window, PlaybackSettings settings)
     {
-        this.window=window; this.settings=settings; Background=new SolidColorBrush(Windows.UI.Color.FromArgb(255,33,34,44)); MinHeight=120;
+        this.window=window; this.settings=settings; Background=new SolidColorBrush(Windows.UI.Color.FromArgb(255,33,34,44)); MinHeight=120; IsTabStop=true;
         Loaded+=(_,_)=>Position(); LayoutUpdated+=(_,_)=>Position(); Unloaded+=(_,_)=>Hide(true);
     }
     public Task InitializeAsync()=>initialization??=InitializeCoreAsync();
+    public Windows.Graphics.RectInt32? ClientBounds()
+    {
+        if(disposed || XamlRoot==null || ActualWidth<1 || ActualHeight<1 || window.Content is not UIElement root) return null;
+        try { var point=TransformToVisual(root).TransformPoint(new Point(0,0)); var scale=XamlRoot.RasterizationScale; return new((int)(point.X*scale),(int)(point.Y*scale),(int)(ActualWidth*scale),(int)(ActualHeight*scale)); }
+        catch(ArgumentException) { return null; }
+    }
     private async Task InitializeCoreAsync()
     {
         if(disposed) return;
         var parent=WinRT.Interop.WindowNative.GetWindowHandle(window);
         child=CreateWindowEx(0,"STATIC","",0x40000000|0x10000000|0x04000000|0x02000000,0,0,1,1,parent,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
         if(child==IntPtr.Zero) throw new InvalidOperationException("Could not create the video surface.");
-        callback=(h,m,w,l,id,d)=> { if(m is 0x200 or 0x201 or 0x245) Activity?.Invoke(); if(m==0x246) pointerStart=new((short)((long)l&65535),(short)(((long)l>>16)&65535)); if(m==0x247) { var y=(short)(((long)l>>16)&65535); if(Math.Abs(y-pointerStart.Y)>80) Swipe?.Invoke(y>pointerStart.Y ? -1 : 1); } if(m==0x202) SetFocus(parent); return DefSubclassProc(h,m,w,l); };
+        callback=(h,m,w,l,id,d)=> { if(m is 0x200 or 0x201 or 0x245) Activity?.Invoke(); if(m==0x246) pointerStart=new((short)((long)l&65535),(short)(((long)l>>16)&65535)); if(m==0x247) { var y=(short)(((long)l>>16)&65535); if(Math.Abs(y-pointerStart.Y)>80) Swipe?.Invoke(y>pointerStart.Y ? -1 : 1); } if(m==0x202) { SetFocus(parent); Pressed?.Invoke(); } return DefSubclassProc(h,m,w,l); };
         SetWindowSubclass(child,callback,1,0); hidden=true; ShowWindow(child,0); var hwnd=child; var player=await Task.Run(()=>new MpvPlayer(hwnd,settings)); if(disposed) { player.Dispose(); return; } Player=player; Initialized?.Invoke(); Position();
     }
     private void Position()

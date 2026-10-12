@@ -97,17 +97,9 @@ public sealed partial class MainWindow
             var down=new MenuFlyoutItem { Text="Move down",IsEnabled=index>=0 && index<rows.Count-1,Icon=new FontIcon { Glyph="\uE70D" } };
             up.Click+=(_,_)=>_=GuardAsync(()=>MoveAsync(row,-1)); down.Click+=(_,_)=>_=GuardAsync(()=>MoveAsync(row,1));
             var remove=new MenuFlyoutItem { Text="Remove from favorites",Icon=new FontIcon { Glyph="\uE735",Foreground=new SolidColorBrush(Color("#F1FA8C")) } }; remove.Click+=(_,_)=>_=GuardAsync(()=>ToggleFavoriteAsync(row.Channel));
-            menu.Items.Add(up); menu.Items.Add(down); menu.Items.Add(new MenuFlyoutSeparator()); menu.Items.Add(remove); menu.ShowAt(button);
+            var play=new MenuFlyoutItem { Text="Play channel",Icon=new FontIcon { Glyph="\uE768" } }; play.Click+=(_,_)=>_=GuardAsync(()=>PlayAsync(row.Channel));
+            menu.Items.Add(play); menu.Items.Add(new MenuFlyoutSeparator()); menu.Items.Add(up); menu.Items.Add(down); menu.Items.Add(new MenuFlyoutSeparator()); menu.Items.Add(remove); menu.ShowAt(button);
         }
-        Grid NowMarker(DateTimeOffset start,out Action update)
-        {
-            var overlay=new Grid { IsHitTestVisible=false };
-            overlay.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); overlay.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-            var line=new Border { Width=1,Background=new SolidColorBrush(Color("#50FA7B")),HorizontalAlignment=HorizontalAlignment.Right,Opacity=.55 }; Place(overlay,line);
-            update=()=> { var elapsed=(DateTimeOffset.Now-start).TotalMinutes; overlay.Visibility=elapsed is >=0 and <=120 ? Visibility.Visible : Visibility.Collapsed; overlay.ColumnDefinitions[0].Width=new(Math.Max(.001,Math.Clamp(elapsed,0,120)),GridUnitType.Star); overlay.ColumnDefinitions[1].Width=new(Math.Max(.001,120-Math.Clamp(elapsed,0,120)),GridUnitType.Star); };
-            update(); return overlay;
-        }
-        var headerMarker=NowMarker(guideStart,out var updateHeader); Grid.SetColumnSpan(headerMarker,4); hours.Children.Add(headerMarker);
         void BuildGuideContainer(ListViewBase sender,ContainerContentChangingEventArgs args)
         {
             if(args.ItemContainer.ContentTemplateRoot is not Grid grid) return;
@@ -115,7 +107,7 @@ public sealed partial class MainWindow
             if(args.Item is not GuideRow row) return;
             grid.Children.Clear(); grid.ColumnDefinitions.Clear(); grid.ColumnSpacing=12;
             grid.ColumnDefinitions.Add(new() { Width=new(280) }); grid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-            var channel=new Grid { ColumnSpacing=6 }; channel.ColumnDefinitions.Add(new() { Width=new(24) }); channel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); channel.ColumnDefinitions.Add(new() { Width=new(34) });
+            var channel=new Grid { ColumnSpacing=6 }; channel.ColumnDefinitions.Add(new() { Width=new(24) }); channel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); channel.ColumnDefinitions.Add(new() { Width=new(40) }); channel.ColumnDefinitions.Add(new() { Width=new(34) });
             Place(channel,reorder.Grip(row,grid));
             var watchChannel=Button("",()=>_=GuardAsync(()=>PlayAsync(row.Channel))); watchChannel.Padding=new Thickness(4); watchChannel.Background=null; watchChannel.BorderThickness=new Thickness(0); watchChannel.HorizontalAlignment=HorizontalAlignment.Stretch; watchChannel.HorizontalContentAlignment=HorizontalAlignment.Stretch;
             var name=Text(row.Channel.Name,13); name.TextWrapping=TextWrapping.NoWrap; name.TextTrimming=TextTrimming.CharacterEllipsis; name.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold;
@@ -125,7 +117,8 @@ public sealed partial class MainWindow
             var image=new Image { Stretch=Stretch.Uniform }; image.SetBinding(Image.SourceProperty,new Binding { Source=row,Path=new PropertyPath(nameof(ArtworkRow.Artwork)) }); logo.Children.Add(image);
             var channelLabel=new Grid { ColumnSpacing=8 }; channelLabel.ColumnDefinitions.Add(new() { Width=new(40) }); channelLabel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); Place(channelLabel,logo); Place(channelLabel,identity,0,1);
             watchChannel.Content=channelLabel; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(watchChannel,"Watch "+row.Channel.Name); ToolTipService.SetToolTip(watchChannel,row.Channel.Name); Place(channel,watchChannel,0,1);
-            Button? options=null; options=IconButton("\uE712","Options for "+row.Channel.Name,()=>ShowOptions(options!,row)); options.Width=34; Place(channel,options,0,2); Place(grid,channel);
+            var playChannel=IconButton("\uE768","Play "+row.Channel.Name,()=>_=GuardAsync(()=>PlayAsync(row.Channel))); playChannel.Width=40; playChannel.Foreground=new SolidColorBrush(Color("#BD93F9")); Place(channel,playChannel,0,2);
+            Button? options=null; options=IconButton("\uE712","Options for "+row.Channel.Name,()=>ShowOptions(options!,row)); options.Width=34; Place(channel,options,0,3); Place(grid,channel);
             var timeline=new Grid(); var updates=new List<Action>();
             if(row.Shows.Length==0) { var missing=Text("Schedule unavailable · Select the channel to watch",12); missing.Opacity=.65; missing.VerticalAlignment=VerticalAlignment.Center; missing.Margin=new Thickness(12); timeline.Children.Add(missing); }
             foreach(var show in row.Shows)
@@ -146,9 +139,9 @@ public sealed partial class MainWindow
                     cell.BorderThickness=new Thickness(selected ? 1 : 0); cell.BorderBrush=new SolidColorBrush(Color("#BD93F9"));
                 };
                 update(); updates.Add(update); cell.Click+=(_,_)=> { foreach(var updateVisible in timeUpdates.Values) updateVisible(); };
+                cell.DoubleTapped+=(_,args)=> { args.Handled=true; _=GuardAsync(()=>PlayAsync(row.Channel)); };
                 var segment=new Grid(); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,start),GridUnitType.Star) }); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,end-start),GridUnitType.Star) }); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,120-end),GridUnitType.Star) }); Place(segment,cell,0,1); timeline.Children.Add(segment);
             }
-            timeline.Children.Add(NowMarker(row.Start,out var updateMarker)); updates.Add(updateMarker);
             timeUpdates[grid]=()=> { foreach(var update in updates) update(); }; Place(grid,timeline,0,1);
         }
         list.ContainerContentChanging+=(sender,args)=> { if(args.InRecycleQueue) { BuildGuideContainer(sender,args); return; } if(args.Phase==0) { args.RegisterUpdateCallback(1,BuildGuideContainer); return; } BuildGuideContainer(sender,args); };
@@ -179,7 +172,7 @@ public sealed partial class MainWindow
             }
             catch(OperationCanceledException) { }
         }
-        tick.Tick+=(_,_)=> { if(currentTab!="Guide" || reorder.IsDragging) return; updateHeader(); UpdateInfo(); foreach(var update in timeUpdates.Values) update(); };
+        tick.Tick+=(_,_)=> { if(currentTab!="Guide" || reorder.IsDragging) return; UpdateInfo(); foreach(var update in timeUpdates.Values) update(); };
         list.Loaded+=(_,_)=>tick.Start(); list.Unloaded+=(_,_)=> { unloaded=true; pending?.Cancel(); tick.Stop(); reorder.Dispose(); timeUpdates.Clear(); };
         search.TextChanged+=(_,_)=>_=GuardAsync(()=>PopulateAsync(true)); refreshGuide=()=>_=GuardAsync(()=>PopulateAsync(false)); _=GuardAsync(()=>PopulateAsync(false)); return page;
     }

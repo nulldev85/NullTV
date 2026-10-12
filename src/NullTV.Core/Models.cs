@@ -107,6 +107,7 @@ public sealed class PlaybackSettings
     public int BufferMiB { get; set; } = 64;
     public string AudioLanguage { get; set; } = "eng";
     public string SubtitleLanguage { get; set; } = "eng";
+    public bool SubtitlesEnabled { get; set; }
     public string AudioDevice { get; set; } = "auto";
     public bool Passthrough { get; set; }
     public bool Deinterlace { get; set; }
