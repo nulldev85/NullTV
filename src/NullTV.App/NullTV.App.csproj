@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows10.0.19041.0</TargetFramework><TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+  <RootNamespace>NullTV.App</RootNamespace><AssemblyName>NullTV</AssemblyName><UseWinUI>true</UseWinUI><WindowsPackageType>None</WindowsPackageType>
+  <Platforms>ARM64</Platforms><PlatformTarget>ARM64</PlatformTarget><RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+  <SelfContained>true</SelfContained><WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained><PublishSingleFile>false</PublishSingleFile><PublishTrimmed>false</PublishTrimmed><ApplicationManifest>app.manifest</ApplicationManifest>
+ </PropertyGroup>
+ <ItemGroup>
+  <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+  <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
+  <ProjectReference Include="../NullTV.Core/NullTV.Core.csproj" />
+  <Content Include="../../native/libmpv-2.dll" Link="libmpv-2.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+ </ItemGroup>
+</Project>

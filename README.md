@@ -22,7 +22,7 @@ Outputs: `artifacts/NullTV-win-arm64.zip`, `artifacts/NullTV-arm64.msix`. The ap
 
 ## CI and repository
 
-[NullTV repository](https://github.com/nulldev85/NullTV) · [Actions](https://github.com/nulldev85/NullTV/actions). Select a successful **Native ARM64 build** run and download the **NullTV-win-arm64** artifact (GitHub wraps the portable ZIP and optional MSIX in an artifact ZIP). The workflow uses `windows-11-arm` and supports push, pull request and manual dispatch. The browser bootstrap repository can store `NullTV-source.zip` plus the workflow; the workflow extracts that source archive. Once Git authentication is available, replace this bootstrap archive with the ordinary source tree and keep the same workflow.
+[NullTV repository](https://github.com/nulldev85/NullTV) · [Actions](https://github.com/nulldev85/NullTV/actions). Select a successful **Native ARM64 build** run and download the **NullTV-win-arm64** artifact (GitHub wraps the portable ZIP and optional MSIX in an artifact ZIP). The workflow uses `windows-11-arm` and supports push, pull request and manual dispatch. The repository contains the ordinary source tree; run `build.ps1` from its root.
 
 ## Architecture and engine
 
@@ -36,13 +36,15 @@ Tradeoffs: upstream Windows builds are community builds, and this pin is a devel
 
 ## Security and behavior
 
-Entire settings and channel-cache files are encrypted with current-user DPAPI; passwords, tokens and credential-bearing playlist/EPG addresses are masked in source forms. Backup uses PBKDF2-SHA256 (210,000 iterations), random salt/nonce and AES-256-GCM; lost passwords cannot be recovered. Logs record fixed event codes and exception types only. Diagnostics exclude source addresses, names, user IDs, tokens, channel titles and credentials. Artwork is limited to 4 MiB per image and 128 MiB / 500 disk entries, with four downloads in flight.
+Entire settings and channel-cache files are encrypted with current-user DPAPI; passwords, tokens and credential-bearing playlist/EPG addresses are masked in source forms. Backup uses PBKDF2-SHA256 (210,000 iterations), random salt/nonce and AES-256-GCM; lost passwords cannot be recovered. Logs record fixed event codes, exception types and method names only; exception messages and source file paths are excluded. Diagnostics exclude source addresses, names, user IDs, tokens, channel titles and credentials. Artwork is limited to 4 MiB per image and 128 MiB / 500 disk entries, with four downloads in flight.
 
 ListView/GridView virtualize channels and posters. Playlist parsing and source refresh run off the UI thread. Energy Saver pauses automatic refresh; explicit refresh remains available. Offline catalogs survive restart. Reconnect backs off 1, 2, 4, 8, 16, 30 seconds, then stops after six failures. Favorites and history are profile-specific. Catch-up requires an advertised archive window, matching provider EPG listing and a successful media response before playback; providers use differing timestamp conventions, so catch-up can still fail.
 
 ## Features and limitations
 
 See [FEATURES.md](FEATURES.md) for the exact implemented/partial/deferred matrix and [CHANGELOG.md](CHANGELOG.md) for validation at each milestone. Server credentials were not supplied during development: integration behavior must be checked against your provider and your server versions. JSON fixtures are synthetic provider-shaped responses, not recordings of a real user's account. Reminders are in-app and require NullTV to remain running. Media servers direct-play only; DRM, transcoding negotiation and Plex server discovery are not implemented. No external content is bundled.
+
+The default OLED appearance uses a true-black background, warm charcoal panels, soft ivory text and a restrained champagne accent. Screenshots in `docs/screenshots` show the native app with no provider configured. Change the theme or accent under Settings → Appearance.
 
 ## Bug report
 

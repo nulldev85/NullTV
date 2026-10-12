@@ -10,20 +10,14 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: 8.0.x
-      - name: Extract source archive when using browser bootstrap
-        shell: pwsh
-        run: |
-          if (Test-Path NullTV-source.zip) { Expand-Archive NullTV-source.zip -DestinationPath source -Force }
       - name: Test and publish native ARM64
         shell: pwsh
-        run: |
-          $sourceRoot = if (Test-Path source/NullTV/build.ps1) { 'source/NullTV' } else { '.' }
-          & "$sourceRoot/build.ps1" -Msix
-      - uses: actions/upload-artifact@v4
+        run: ./build.ps1 -Msix
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: NullTV-win-arm64
           path: |

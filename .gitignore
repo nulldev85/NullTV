@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+artifacts/
+native/*.dll
+native/*.7z
+work/
+*.user
+*.pfx
