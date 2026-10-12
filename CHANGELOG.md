@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1 — 2026-10-12
+
+- Clicking a Guide channel starts a native preview beside the programme information, within Guide. Removed the separate row play icons and Play channel menu action.
+- Guide fullscreen and window expansion use the same video session; Escape returns to the schedule with search, scroll and channel order retained. Browsing time windows no longer rebuilds the player or switches tabs. Channel stepping in Guide follows favorite order.
+- Added compact hover controls and a compact stream panel for the Guide preview. Fullscreen retains the complete player controls, CC and LIVE action.
+- Media Servers connector cards use equal rows and aligned, full-width action buttons. Bundled the official Jellyfin, Emby and Plex logo assets for offline display.
+
 ## 0.4.0 — 2026-10-12
 
 - Added explicit channel play actions and programme double-tap playback to the favorite Guide. Removed the vertical time marker and retained each current programme's progress bar.

@@ -26,10 +26,25 @@ public sealed partial class MainWindow
             var s=source; page.Children.Add(Stack(Text(s.Name,20),Text(s.AccountStatus,12),AsyncButton("Browse / refresh library",async ()=> { catalogs[s.Id]=await new MediaServerClient(http).BrowseAsync(s,lifetime.Token); await store.SaveCacheAsync(s.Id,catalogs[s.Id]); await store.SaveAsync(settings); RebuildItems(); Navigate("Movies & Series"); })));
         }
         var connectors=new Grid { ColumnSpacing=16 }; for(int i=0;i<3;i++) connectors.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-        var jelly=Stack(new FontIcon { Glyph="\uE968",FontSize=26,HorizontalAlignment=HorizontalAlignment.Left,Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#BD93F9")) },Text("Jellyfin",22),Text("Connect your own server with a login or API key.",13),Primary("Connect Jellyfin",ConnectServerAsync));
-        var emby=Stack(new FontIcon { Glyph="\uE968",FontSize=26,HorizontalAlignment=HorizontalAlignment.Left,Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B")) },Text("Emby",22),Text("Browse your libraries and sync watched progress.",13),AsyncButton("Connect Emby",()=>ConnectServerAsync(SourceKind.Emby)));
-        var plex=Stack(new FontIcon { Glyph="\uE768",FontSize=26,HorizontalAlignment=HorizontalAlignment.Left,Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#BD93F9")) },Text("Plex",22),Text("Sign in with a short code and connect your server.",13),AsyncButton("Sign in with PIN",ConnectPlexAsync));
-        Place(connectors,Card(jelly,new Thickness(24))); Place(connectors,Card(emby,new Thickness(24)),0,1); Place(connectors,Card(plex,new Thickness(24)),0,2); page.Children.Add(connectors);
+        Border Connector(string name,string asset,string description,string action,Func<Task> connect)
+        {
+            var content=new Grid { RowSpacing=16,MinHeight=264 };
+            content.RowDefinitions.Add(new() { Height=new(56) });
+            content.RowDefinitions.Add(new() { Height=GridLength.Auto });
+            content.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
+            content.RowDefinitions.Add(new() { Height=GridLength.Auto });
+            var uri=new Uri(Path.Combine(AppContext.BaseDirectory,"Assets","Servers",asset));
+            var logo=new Image { Height=48,MaxWidth=150,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Stretch=Microsoft.UI.Xaml.Media.Stretch.Uniform };
+            logo.Source=asset.EndsWith(".svg") ? new Microsoft.UI.Xaml.Media.Imaging.SvgImageSource(uri) : new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(uri);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(logo,name+" logo"); Place(content,logo);
+            var title=Text(name,22); title.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; Place(content,title,1);
+            var copy=Text(description,13); copy.Opacity=.7; Place(content,copy,2);
+            var button=Primary(action,connect); button.Height=44; button.HorizontalAlignment=HorizontalAlignment.Stretch; button.HorizontalContentAlignment=HorizontalAlignment.Center; Place(content,button,3);
+            return Card(content,new Thickness(24));
+        }
+        Place(connectors,Connector("Jellyfin","jellyfin.svg","Connect your own server with a login or API key.","Connect Jellyfin",ConnectServerAsync));
+        Place(connectors,Connector("Emby","emby.png","Browse your libraries and sync watched progress.","Connect Emby",()=>ConnectServerAsync(SourceKind.Emby)),0,1);
+        Place(connectors,Connector("Plex","plex.svg","Sign in with a short code and connect your server.","Sign in with PIN",ConnectPlexAsync),0,2); page.Children.Add(connectors);
         var note=Text("Your libraries stay with you. NullTV connects to the servers you choose and remembers where you left off.",12); note.Opacity=.45; note.Margin=new Thickness(4,12,0,0); page.Children.Add(note); return Scroll(page);
     }
     private Task ConnectServerAsync() => ConnectServerAsync(SourceKind.Jellyfin);

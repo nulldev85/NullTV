@@ -10,6 +10,7 @@
   <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
   <ProjectReference Include="../NullTV.Core/NullTV.Core.csproj" />
   <Content Include="../../native/libmpv-2.dll" Link="libmpv-2.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="Assets/Servers/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
  </ItemGroup>
  <Target Name="PublishAppXamlResources" AfterTargets="Publish">
   <ItemGroup><AppXamlResources Include="$(TargetDir)**/*.xbf;$(TargetDir)$(AssemblyName).pri" /></ItemGroup>

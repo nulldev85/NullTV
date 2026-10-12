@@ -31,7 +31,7 @@ public sealed partial class MainWindow : Window
     private Grid? livePage;
     private string currentTab="Live TV";
     private bool libraryNowPlaying;
-    private bool IsPlayerVisible=>currentTab=="Live TV" || currentTab=="Movies & Series" && libraryNowPlaying;
+    private bool IsPlayerVisible=>currentTab=="Live TV" || currentTab=="Movies & Series" && libraryNowPlaying || currentTab=="Guide" && playing?.Kind==MediaKind.Live;
     private readonly DispatcherTimer timer=new() { Interval=TimeSpan.FromSeconds(1) };
     private int ticks;
     private bool busy;
@@ -157,13 +157,23 @@ public sealed partial class MainWindow : Window
     private ScrollViewer Scroll(UIElement element) => new() { Content=element,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
     private void Navigate(string tab,bool nowPlaying=false)
     {
+        if(currentTab=="Guide" && tab=="Guide" && guidePage!=null) return;
+        if(currentTab=="Guide")
+        {
+            if(fullscreen) ToggleFullscreen(); expandedVideo=false;
+            MoveVideo(videoHome); pageHost.Margin=new Thickness(28,18,28,20);
+            if(sidebar!=null) sidebar.Visibility=navigationHidden ? Visibility.Collapsed : Visibility.Visible;
+            root.ColumnDefinitions[0].Width=new(navigationHidden ? 0 : 184);
+            guidePage=null; guidePreview=null; guideVideoExpanded=null; selectGuideChannel=null; refreshGuide=null;
+        }
         currentTab=tab; libraryNowPlaying=tab=="Movies & Series" && nowPlaying; playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible);
         foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .65; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); }
         foreach(var child in pageHost.Children) child.Visibility=Visibility.Collapsed;
-        if(IsPlayerVisible) { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!active.ContainsKey(s)); UpdateLiveLayout(); return; }
+        if(tab=="Live TV" || libraryNowPlaying) { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!active.ContainsKey(s)); UpdateLiveLayout(); return; }
         // Other pages are rebuilt to reflect profile and settings changes.
         foreach(var child in pageHost.Children.Where(c=>c!=livePage).ToArray()) pageHost.Children.Remove(child);
         pageHost.Children.Add(tab switch { "Guide"=>BuildGuide(), "Movies & Series"=>BuildLibrary(), "Media Servers"=>BuildServers(), _=>BuildSettings() });
+        if(tab=="Guide") { if(multi) ToggleMulti(); UpdateGuideVideoLayout(); }
     }
     private void RebuildItems() { int number=0; items=settings.Profile.Sources.SelectMany(s=>catalogs.GetValueOrDefault(s.Id)?.Items??[]).Select(i=>i.Kind==MediaKind.Live ? i with { Number=++number } : i).ToList(); foreach(var catalog in catalogs.Values) foreach(var (id,remote) in catalog.RemoteHistory) { if(!settings.Profile.History.TryGetValue(id,out var local) || remote.Updated>local.Updated) settings.Profile.History[id]=remote; } UpdateLive(); if(currentTab=="Movies & Series") refreshLibrary?.Invoke(); if(currentTab=="Guide") refreshGuide?.Invoke(); }
     private async Task RefreshAllAsync(bool force)

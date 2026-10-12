@@ -26,6 +26,7 @@ public sealed class VideoSurface : UserControl, IDisposable
     private Task? initialization;
     private (int X,int Y,int W,int H) bounds;
     public MpvPlayer? Player { get; private set; }
+    public bool IsHidden=>hidden;
     public event Action? Activity;
     public event Action? Pressed;
     public event Action<int>? Swipe;

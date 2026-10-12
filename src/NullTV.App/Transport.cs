@@ -45,11 +45,12 @@ public sealed partial class MainWindow
     {
         if(primaryTransport==null || closed) return;
         var item=playing??lastPlayed; var state=surface?.Player?.State; var running=playing!=null && state?.Idle==false; var live=item?.Kind==MediaKind.Live;
+        if(guideFullscreenButton!=null) guideFullscreenButton.IsEnabled=playing?.Kind==MediaKind.Live && running;
         LabelButton(primaryTransport,running && !state!.Paused ? "\uE769" : "\uE768",running && !state!.Paused ? "Pause" : "Play");
         primaryTransport.IsEnabled=item!=null;
         if(stopButton!=null) stopButton.IsEnabled=running;
-        if(previousButton!=null) previousButton.Visibility=item?.Kind==MediaKind.Live ? Visibility.Visible : Visibility.Collapsed;
-        if(nextButton!=null) nextButton.Visibility=item?.Kind==MediaKind.Live ? Visibility.Visible : Visibility.Collapsed;
+        if(previousButton!=null) previousButton.Visibility=item?.Kind==MediaKind.Live && !compactVideoControls ? Visibility.Visible : Visibility.Collapsed;
+        if(nextButton!=null) nextButton.Visibility=item?.Kind==MediaKind.Live && !compactVideoControls ? Visibility.Visible : Visibility.Collapsed;
         if(rewindButton!=null) { rewindButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; rewindButton.IsEnabled=running && state?.Duration>0; }
         if(forwardButton!=null) { forwardButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; forwardButton.IsEnabled=running && state?.Duration>0; }
         if(liveBar!=null) liveBar.Visibility=playing!=null && live ? Visibility.Visible : Visibility.Collapsed;
@@ -129,6 +130,14 @@ public sealed partial class MainWindow
     private void UpdateEmptyPlayer()
     {
         if(emptyLive is not Grid host) return;
+        if(currentTab=="Guide")
+        {
+            host.Visibility=playing?.Kind==MediaKind.Live && surface!=null && active.ContainsKey(surface) ? Visibility.Collapsed : Visibility.Visible;
+            if(emptyPlayerMode=="guide") return; emptyPlayerMode="guide"; host.Children.Clear();
+            var title=Text("Select a channel to preview",14); title.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; title.TextAlignment=TextAlignment.Center;
+            var detail=Text("Click a channel name below",11); detail.Opacity=.6; detail.TextAlignment=TextAlignment.Center;
+            var placeholder=Stack(new FontIcon { Glyph="\uE714",FontSize=26,Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#BD93F9")) },title,detail); placeholder.VerticalAlignment=VerticalAlignment.Center; placeholder.HorizontalAlignment=HorizontalAlignment.Center; host.Children.Add(placeholder); host.Visibility=playing?.Kind==MediaKind.Live && surface!=null && active.ContainsKey(surface) ? Visibility.Collapsed : Visibility.Visible; return;
+        }
         var mode=lastPlayed?.Id??(items.Any(i=>i.Kind==MediaKind.Live) ? "channels" : "source"); if(mode==emptyPlayerMode) return; emptyPlayerMode=mode; host.Children.Clear();
         host.Children.Add(lastPlayed is { } last ? EmptyState("\uE768","Ready when you are.",last.Name,"Play again",()=>PlayAsync(last)) : mode=="channels" ? EmptyState("\uE714","Choose what to watch.","Pick a channel from the list, or find one with search.","Show channels",()=> { channelsHidden=false; UpdateLiveLayout(); return Task.CompletedTask; }) : EmptyState("\uE714","Your screen. Your television.","Add your own account or playlist to get started.","Add a source",()=>EditSourceAsync(null)));
     }

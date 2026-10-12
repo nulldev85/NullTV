@@ -31,7 +31,8 @@ public sealed class PlayerOverlay : IDisposable
     private bool disposed,keyboardInteraction;
     private DateTimeOffset revealUntil;
     public bool IsVisible { get; private set; }
-    public event Action<double>? WidthChanged;
+    private bool? compactLayout;
+    public event Action<double,bool>? LayoutChanged;
     public event Action<bool>? VisibilityChanged;
     public PlayerOverlay(Window owner,FrameworkElement controlContent,FrameworkElement detailContent,Func<(VideoSurface?,bool)> current,Action focusBack)
     {
@@ -64,6 +65,9 @@ public sealed class PlayerOverlay : IDisposable
         if(disposed) return;
         var (video,available)=current(); var bounds=video?.ClientBounds();
         if(!available || bounds==null || !owner.AppWindow.IsVisible || IsIconic(hwnd)) { Hide(); return; }
+        // XAML may deliver Unloaded from the old parent after a same-frame
+        // reparent. The current, laid-out host is authoritative for HWND visibility.
+        video!.Hide(false);
         var rect=bounds.Value; var scale=(owner.Content as FrameworkElement)?.XamlRoot?.RasterizationScale??1;
         if(rect.Width<220*scale || rect.Height<160*scale) { Hide(); return; }
         GetCursorPos(out var screenPoint); var hit=WindowFromPoint(screenPoint); var point=screenPoint; ScreenToClient(hwnd,ref point);
@@ -71,14 +75,17 @@ public sealed class PlayerOverlay : IDisposable
         var foreground=GetAncestor(GetForegroundWindow(),2)==hwnd;
         var show=over || foreground && (DateTimeOffset.UtcNow<revealUntil || keyboardInteraction && controls.HasFocus);
         if(!show) { if(IsVisible) Hide(); return; }
-        var inset=(int)Math.Round(12*scale); var height=(int)Math.Round(116*scale);
+        var compact=rect.Height/scale<340 || rect.Width/scale<500;
+        var inset=(int)Math.Round(12*scale); var height=(int)Math.Round((compact ? 104 : 116)*scale);
         var nextControls=new RectInt32(rect.X+inset,rect.Y+rect.Height-height-inset,rect.Width-inset*2,height);
-        var infoWidth=(int)Math.Round(Math.Min(290,rect.Width/scale-24)*scale); var infoHeight=(int)Math.Round(180*scale);
+        var infoWidth=(int)Math.Round(Math.Min(compact ? 210 : 290,rect.Width/scale-24)*scale); var infoHeight=(int)Math.Round((compact ? 58 : 180)*scale);
         var nextDetails=new RectInt32(rect.X+rect.Width-infoWidth-inset,rect.Y+inset,infoWidth,Math.Min(infoHeight,rect.Height-height-inset*3));
         var moved=nextControls!=controlBounds || nextDetails!=detailBounds;
-        if(nextControls!=controlBounds) { controlBounds=nextControls; controls.SiteBridge.MoveAndResize(controlBounds); Round(controls,controlBounds,scale); WidthChanged?.Invoke(controlBounds.Width/scale); }
+        if(nextControls!=controlBounds || compactLayout!=compact) { controlBounds=nextControls; compactLayout=compact; controls.SiteBridge.MoveAndResize(controlBounds); Round(controls,controlBounds,scale); LayoutChanged?.Invoke(controlBounds.Width/scale,compact); }
         if(nextDetails!=detailBounds) { detailBounds=nextDetails; details.SiteBridge.MoveAndResize(detailBounds); Round(details,detailBounds,scale); }
-        if(moved || !IsVisible) { controls.SiteBridge.MoveInZOrderAtTop(); details.SiteBridge.MoveInZOrderAtTop(); }
+        // A late native video resize can raise its child after XAML layout.
+        // Reassert the overlay order while visible so controls never sit behind video.
+        controls.SiteBridge.MoveInZOrderAtTop(); details.SiteBridge.MoveInZOrderAtTop();
         if(!IsVisible) { controls.SiteBridge.Show(); details.SiteBridge.Show(); IsVisible=true; VisibilityChanged?.Invoke(true); }
     }
     private static void Round(DesktopWindowXamlSource source,RectInt32 bounds,double scale)
