@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-10-12
+
+- Corrected the default to full Dracula Classic: #282A36 app background, #21222C surfaces and #343746 raised controls. Removed the black-background OLED variant.
+- Existing OLED, Dark and Dracula OLED preferences migrate automatically to Classic while retaining encrypted sources, favorites, saved guide order and watch history.
+- Empty player surfaces and the packaged Windows tile now use Dracula colors. About and diagnostics report the actual assembly version.
+
+
 ## 0.3.0 — 2026-10-12
 
 - Guide now shows favorite live channels, including channels without programme data. Added logos/numbers, aligned time labels, a current-time marker, airing progress/remaining time, channel-name/programme search, captured drag grips and Move up/Move down actions.

@@ -22,7 +22,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string,Catalog> catalogs=[];
     private readonly Dictionary<string,List<Programme>> epgs=[];
     private List<MediaItem> items=[];
-    private readonly Grid root=new();
+    private readonly Grid root=new() { Background=new SolidColorBrush(Color("#282A36")),RequestedTheme=ElementTheme.Dark };
     private readonly Grid pageHost=new();
     private readonly StackPanel navigation=new() { Orientation=Orientation.Vertical, Spacing=6 };
     private Border? sidebar;
@@ -87,7 +87,6 @@ public sealed partial class MainWindow : Window
         var width=(int)Math.Min(1280*dpi,display.Width*.94); var height=(int)Math.Min(820*dpi,display.Height*.94);
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(display.X+(display.Width-width)/2,display.Y+(display.Height-height)/2,width,height));
         imageCache=new(http,Path.Combine(store.DirectoryPath,"images"));
-        if(settings.Appearance.Theme is "OLED" or "Dark") { settings.Appearance.Theme=settings.Appearance.Theme=="OLED" ? "Dracula OLED" : "Dracula"; settings.Appearance.Accent="#BD93F9"; }
         if(settings.Appearance.Accent is "#D6C3A5" or "#6EE7C4" or "#D3D6DC") settings.Appearance.Accent="#BD93F9";
         ApplyAppearance(); BuildLive(); Navigate(settings.StartupTab);
         foreach(var s in settings.Profile.Sources) { var cached=await store.LoadCacheAsync(s.Id); if(cached!=null) catalogs[s.Id]=cached; }
@@ -106,7 +105,7 @@ public sealed partial class MainWindow : Window
     private void ApplyAppearance()
     {
         root.RequestedTheme=settings.Appearance.Theme=="Light" ? ElementTheme.Light : ElementTheme.Dark;
-        root.Background=new SolidColorBrush(settings.Appearance.Theme.Contains("OLED") ? Colors.Black : settings.Appearance.Theme=="Light" ? Color("#F4F6F7") : Color("#282A36"));
+        root.Background=new SolidColorBrush(settings.Appearance.Theme=="Light" ? Color("#F4F6F7") : Color("#282A36"));
         if(settings.Appearance.Mica && settings.Appearance.Theme=="Light") { root.Background=null; SystemBackdrop=new MicaBackdrop(); } else SystemBackdrop=null;
         root.Resources["SystemAccentColor"]=Color(settings.Appearance.Accent);
         root.Resources["ListViewItemBackgroundSelected"]=new SolidColorBrush(Color(RaisedHex));

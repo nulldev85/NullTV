@@ -31,7 +31,7 @@ public sealed class VideoSurface : UserControl, IDisposable
     public event Action? Initialized;
     public VideoSurface(Window window, PlaybackSettings settings)
     {
-        this.window=window; this.settings=settings; Background=new SolidColorBrush(Microsoft.UI.Colors.Black); MinHeight=120;
+        this.window=window; this.settings=settings; Background=new SolidColorBrush(Windows.UI.Color.FromArgb(255,33,34,44)); MinHeight=120;
         Loaded+=(_,_)=>Position(); LayoutUpdated+=(_,_)=>Position(); Unloaded+=(_,_)=>Hide(true);
     }
     public Task InitializeAsync()=>initialization??=InitializeCoreAsync();

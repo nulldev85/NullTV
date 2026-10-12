@@ -49,8 +49,7 @@ public sealed partial class MainWindow
         UpdateLiveLayout();
     }
     private static bool LightFields=>App.Main?.settings.Appearance.Theme=="Light";
-    private bool IsDracula=>settings.Appearance.Theme.StartsWith("Dracula",StringComparison.Ordinal);
-    private string SurfaceHex=>settings.Appearance.Theme=="Light" ? "#FFFFFF" : settings.Appearance.Theme.Contains("OLED") ? "#191A21" : "#21222C";
+    private string SurfaceHex=>settings.Appearance.Theme=="Light" ? "#FFFFFF" : "#21222C";
     private string RaisedHex=>settings.Appearance.Theme=="Light" ? "#E8EAEE" : "#343746";
     private string BorderHex=>settings.Appearance.Theme=="Light" ? "#D3D5DA" : "#44475A";
     private static SolidColorBrush FieldText()=>new(Color(LightFields ? "#202228" : "#F8F8F2"));

@@ -1,6 +1,6 @@
 # Verified Dracula Classic palette
 
-Verified 2026-10-12 against the [official Dracula specification](https://draculatheme.com/spec) and [official theme repository](https://github.com/dracula/dracula-theme). This is the free Classic dark theme. Applied to NullTV after your approval: Dracula Classic and Dracula OLED are available; cyan chrome is omitted according to your earlier preference.
+Verified 2026-10-12 against the [official Dracula specification](https://draculatheme.com/spec) and [official theme repository](https://github.com/dracula/dracula-theme). This is the free Classic dark theme. Applied to NullTV after your approval: Dracula Classic is the default throughout the app; cyan chrome is omitted according to your earlier preference.
 
 The four colors you described are purple **#BD93F9**, deeper UI purple **#815CD6**, yellow **#F1FA8C** and green **#50FA7B**. “Dark Purple” is not a core token; #815CD6 is officially named Functional Purple. [Specification](https://draculatheme.com/spec).
 
@@ -50,4 +50,4 @@ UI surfaces and functional values come from the [official UI specification](http
 
 ANSI values are included for completeness from the [official terminal palette](https://draculatheme.com/spec#ansi-color-palette).
 
-For your OLED screen, preserving true black would create a deliberate NullTV adaptation: Dracula's own background is #282A36. The reference image shows exact RGB swatches; perceived appearance can vary with display settings. Cyan is included in this research for completeness.
+NullTV now uses Dracula's own #282A36 background across the app; the earlier true-black variant has been removed. The reference image shows exact RGB swatches; perceived appearance can vary with display settings. Cyan is included in this research for completeness.

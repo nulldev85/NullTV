@@ -64,7 +64,7 @@ public sealed partial class MainWindow
         Place(channels,channelList,3); channelsCard=Card(channels,new Thickness(14)); Place(livePage,channelsCard,1,1);
         var stage=new Grid { RowSpacing=14 }; playerStage=stage; stage.RowDefinitions.Add(new() { Height=GridLength.Auto }); stage.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); stage.RowDefinitions.Add(new() { Height=GridLength.Auto }); stage.RowDefinitions.Add(new() { Height=GridLength.Auto });
         playingTitle=Text("PLAYER",10); playingTitle.CharacterSpacing=100; playingTitle.Opacity=.5; playingInfo=Text("",12); playingInfo.Opacity=.5; var playerHeading=Stack(playingTitle,playingInfo); playerHeading.Spacing=5; Place(stage,playerHeading);
-        videoGrid=new Grid { Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Black),ColumnSpacing=8,RowSpacing=8 };
+        videoGrid=new Grid { Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(SurfaceHex)),ColumnSpacing=8,RowSpacing=8 };
         surface=CreateSurface(); videoGrid.Children.Add(surface); emptyLive=new Grid(); videoGrid.Children.Add(emptyLive); Place(stage,Card(videoGrid,new Thickness(0)),1);
         seek=new Slider { Minimum=0,Maximum=1,MinHeight=32,IsEnabled=false };
         seek.AddHandler(UIElement.PointerPressedEvent,new PointerEventHandler((_,_)=>seeking=true),true);
@@ -73,7 +73,7 @@ public sealed partial class MainWindow
         progressArea=new Grid { ColumnSpacing=12 }; progressArea.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); progressArea.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); progressArea.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); elapsedLabel=Text("0:00",11); durationLabel=Text("0:00",11); elapsedLabel.VerticalAlignment=durationLabel.VerticalAlignment=VerticalAlignment.Center; elapsedLabel.Opacity=durationLabel.Opacity=.6; Place(progressArea,elapsedLabel); Place(progressArea,seek,0,1); Place(progressArea,durationLabel,0,2); Place(stage,progressArea,2);
         playerControls=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6,HorizontalAlignment=HorizontalAlignment.Center };
         previousButton=IconButton("\uE892","Previous channel",()=>ChannelStep(-1)); playerControls.Children.Add(previousButton);
-        primaryTransport=IconButton("\uE768","Play",ActivateTransport); primaryTransport.Width=48; primaryTransport.Height=48; primaryTransport.CornerRadius=new CornerRadius(24); primaryTransport.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(settings.Appearance.Accent)); primaryTransport.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Black); playerControls.Children.Add(primaryTransport);
+        primaryTransport=IconButton("\uE768","Play",ActivateTransport); primaryTransport.Width=48; primaryTransport.Height=48; primaryTransport.CornerRadius=new CornerRadius(24); primaryTransport.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(settings.Appearance.Accent)); primaryTransport.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#21222C")); playerControls.Children.Add(primaryTransport);
         nextButton=IconButton("\uE893","Next channel",()=>ChannelStep(1)); playerControls.Children.Add(nextButton);
         stopButton=IconButton("\uE71A","Stop",StopPlayback); playerControls.Children.Add(stopButton);
         favoriteButton=IconButton("\uE734","Add to favorites",()=> { var item=playing??lastPlayed; if(item!=null) _=GuardAsync(()=>ToggleFavoriteAsync(item)); }); playerControls.Children.Add(favoriteButton);

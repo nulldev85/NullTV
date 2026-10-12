@@ -89,6 +89,11 @@ public sealed class Settings
         Playback.CacheSeconds = Math.Clamp(Playback.CacheSeconds, 1, 120);
         Playback.BufferMiB = Math.Clamp(Playback.BufferMiB, 8, 512);
         Appearance.FontScale = Math.Clamp(Appearance.FontScale, .8, 1.5);
+        if (Appearance.Theme is "OLED" or "Dark" or "Dracula OLED")
+        {
+            Appearance.Theme = "Dracula";
+            Appearance.Accent = "#BD93F9";
+        }
         LockTimeoutMinutes = Math.Clamp(LockTimeoutMinutes, 1, 120);
         foreach (var s in Profiles.SelectMany(p => p.Sources)) { if(s is null || s.Id is null || s.Id.Length!=32 || !s.Id.All(char.IsAsciiHexDigit) || s.EpgMappings is null || s.Address is null || s.Password is null || s.Username is null || s.ApiKey is null) throw new InvalidDataException("Settings contain an invalid source."); s.RefreshHours = Math.Clamp(s.RefreshHours, 1, 168); if(s.LiveExtension is not ("ts" or "m3u8")) s.LiveExtension="ts"; }
         if(Profiles.SelectMany(p=>p.Sources).GroupBy(s=>s.Id).Any(g=>g.Count()>1)) throw new InvalidDataException("Source identifiers must be unique.");
@@ -116,7 +121,7 @@ public sealed class PlaybackSettings
 }
 public sealed class AppearanceSettings
 {
-    public string Theme { get; set; } = "Dracula OLED";
+    public string Theme { get; set; } = "Dracula";
     public string Accent { get; set; } = "#BD93F9";
     public double FontScale { get; set; } = 1;
     public bool Compact { get; set; }

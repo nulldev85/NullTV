@@ -13,7 +13,7 @@ All five navigation views perform real operations. This is an MVP, not the entir
 | Media servers | Jellyfin/Emby login or API key + user ID, library browse, Plex PIN login, episode browse, direct play, watched sync | Plex URL entered manually; no server discovery or transcoding negotiation; Jellyfin/Emby resume import; Plex resume import limited |
 | Playback settings | Hardware decode, buffer/cache, latency, languages, output identifier, passthrough, deinterlace, aspect, volume, launch resume | Output device identifier entered manually; settings recreate players |
 | Subtitles | Font, size, ARGB colors/background, position | Fonts entered by name; invalid option values reported by engine |
-| Appearance | Verified Dracula Classic / true-black Dracula OLED, light theme, Mica for light theme, accent preference, consistent native fields/dialogs/menus | Cyan chrome omitted by request; font scale affects page text; compact density and reduced-motion preferences currently stored only |
+| Appearance | Verified Dracula Classic throughout the app, light theme, Mica for light theme, accent preference, consistent native fields/dialogs/menus | Cyan chrome omitted by request; font scale affects page text; compact density and reduced-motion preferences currently stored only |
 | Display / input | Fullscreen, HDR hint, keys, touch/pen taps, native vertical swipe, basic Xbox buttons | Pinch resizing, controller remapping, frame-rate switching deferred |
 | Parental | PIN hash, category/item locks, unlock timeout, PIN required to replace/remove locks | Local-device parental control only; not a tamper-proof security boundary |
 | General | Startup tab, English UI, release page link | Windows autostart, localization and automatic updater deferred |
