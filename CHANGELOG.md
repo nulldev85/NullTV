@@ -1,5 +1,13 @@
 # Changelog
 
+## Installer 0.2.1 — 2026-10-12
+
+- Fixed the Windows 11 prerequisite check: use a 64-bit registry search for CurrentBuildNumber instead of MSI's compatibility-dependent WindowsBuild value, which can incorrectly report 9600.
+- Added an installer regression check using a safe Windows Installer session. It verifies the ARM64 template, AppSearch ordering in both installation sequences, the real registry lookup and eight prerequisite cases, including Windows 10 rejection and maintenance/uninstall access.
+- Replaced the default red setup artwork with neutral NullTV branding. The native setup controls retain their readable Windows system appearance.
+- Verified that the normal MSI wizard reads build 26200, passes LaunchConditions and reaches WelcomeEulaDlg. Installation into the real user profile was not performed.
+- This packaging revision contains the unchanged NullTV app 0.2.0.
+
 ## 0.2.0 — 2026-10-12
 
 - Replaced the brown accent with a neutral OLED palette and shared native styles for buttons, text, password and search fields, dropdowns and dialogs.

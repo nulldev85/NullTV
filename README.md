@@ -6,6 +6,8 @@ Native Windows 11 ARM64 IPTV and media-server client for Surface Pro 11. Bring y
 
 Run **NullTV-Setup-arm64.msi**, then launch **NullTV** from the Start menu. The per-user installer registers the app in Windows Settings → Apps and installs it under `%LOCALAPPDATA%\Programs\NullTV`. Close an older running build before installing. Your encrypted sources, profiles and history remain under `%LOCALAPPDATA%\NullTV`.
 
+Installer revision **0.2.1** fixes an incorrect Windows 11 rejection in the original MSI. It includes app **0.2.0** and reads the actual Windows build from the native registry view. The versioned delivery file is `NullTV-Setup-arm64-0.2.1.msi`; build output retains the canonical filename above.
+
 The optional portable version is **NullTV-win-arm64.zip**: extract it completely and run `NullTV-win-arm64/NullTV.exe`. The folder contains the ARM64 .NET runtime, Windows App SDK runtime and `libmpv-2.dll`; no separate runtime installation is required. Windows 11 ARM64 is required. Keep every file beside the executable. Open **Settings → Sources → Add IPTV source**, enter your account or choose your local M3U/M3U8 file, and save. Click a channel in Live TV.
 
 The optional MSIX is **unsigned**. A publisher must sign it using a certificate trusted by the device and matching `CN=NullTV` before `Add-AppxPackage` installation. The MSI is the primary ready-to-install deliverable. It does not require an MSIX signing certificate. It is currently unsigned, so Windows may show an unknown-publisher prompt.
@@ -18,7 +20,7 @@ Install the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) for A
 ./build.ps1 -Msix
 ```
 
-The script restores pinned NuGet dependencies, downloads the pinned ARM64 libmpv archive, verifies SHA-256 and PE machine type, runs tests, publishes `win-arm64` self-contained output and ZIP, builds a per-user ARM64 MSI using pinned WiX 5.0.2 and UI extension 5.0.2, then optionally uses ARM64 MakeAppx from the Windows SDK NuGet package. No Visual Studio installation is needed. Windows `tar` extracts the `.7z` dependency. Downloads require NuGet and GitHub network access. Build tools may internally use an emulated x86/x64 XAML compiler; every app/runtime/playback executable delivered is checked for ARM64.
+The script restores pinned NuGet dependencies, downloads the pinned ARM64 libmpv archive, verifies SHA-256 and PE machine type, runs tests, publishes `win-arm64` self-contained output and ZIP, builds a per-user ARM64 MSI using pinned WiX 5.0.2 and UI extension 5.0.2, then optionally uses ARM64 MakeAppx from the Windows SDK NuGet package. MSI packaging also checks the actual registry search and prerequisite condition through a safe Windows Installer session; it does not install the app. No Visual Studio installation is needed. Windows `tar` extracts the `.7z` dependency. Downloads require NuGet and GitHub network access. Build tools may internally use an emulated x86/x64 XAML compiler; every app/runtime/playback executable delivered is checked for ARM64.
 
 Outputs: `artifacts/NullTV-Setup-arm64.msi`, `artifacts/NullTV-win-arm64.zip`, `artifacts/NullTV-arm64.msix`. The app keeps encrypted data under `%LOCALAPPDATA%\NullTV`; rotating logs are in its `logs` subfolder. Copying portable binaries does not copy credentials. Use password-encrypted Backup / Restore to move settings between Windows users/devices.
 
