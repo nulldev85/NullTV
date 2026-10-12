@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$PublishDirectory,[string]$InstallerVersion='0.4.2')
+param([Parameter(Mandatory)][string]$PublishDirectory,[string]$InstallerVersion='0.5.0')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $publish=(Resolve-Path -LiteralPath $PublishDirectory).Path
@@ -23,7 +23,7 @@ $builder=[Text.StringBuilder]::new()
 [void]$builder.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"><Package Name="NullTV" Manufacturer="NullTV contributors" Version="'+(Xml $InstallerVersion)+'" UpgradeCode="5FF6F3A7-4F45-48C7-8E58-3C80A3CC42FA" Scope="perUser">')
 # MSI's built-in WindowsBuild can report 9600 on Windows 11. Search the
 # native registry view instead; the ARM64 package template enforces CPU type.
-[void]$builder.AppendLine('<MajorUpgrade DowngradeErrorMessage="A newer NullTV version is already installed."/><MediaTemplate EmbedCab="yes" CompressionLevel="high"/><Property Id="NULLTV_WINDOWS_BUILD" Secure="yes"><RegistrySearch Id="NullTVWindowsBuild" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64"/></Property><Launch Condition="Installed OR (VersionNT64 AND NULLTV_WINDOWS_BUILD &gt;= 22000)" Message="NullTV requires Windows 11 ARM64."/>')
+[void]$builder.AppendLine('<MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer NullTV version is already installed."/><MediaTemplate EmbedCab="yes" CompressionLevel="high"/><Property Id="NULLTV_WINDOWS_BUILD" Secure="yes"><RegistrySearch Id="NullTVWindowsBuild" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64"/></Property><Launch Condition="Installed OR (VersionNT64 AND NULLTV_WINDOWS_BUILD &gt;= 22000)" Message="NullTV requires Windows 11 ARM64."/>')
 [void]$builder.AppendLine('<Property Id="ARPURLINFOABOUT" Value="https://github.com/nulldev85/NullTV"/><Property Id="ARPPRODUCTICON" Value="NullTVIcon"/><SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="execute"/>')
 [void]$builder.AppendLine('<Icon Id="NullTVIcon" SourceFile="'+(Xml (Join-Path $root 'packaging/Assets/NullTV.ico'))+'"/>')
 [void]$builder.AppendLine('<StandardDirectory Id="LocalAppDataFolder"><Directory Id="Programs" Name="Programs"><Directory Id="INSTALLFOLDER" Name="NullTV"/></Directory></StandardDirectory><StandardDirectory Id="ProgramMenuFolder"><Directory Id="AppMenuFolder" Name="NullTV"/></StandardDirectory>')
@@ -42,7 +42,8 @@ foreach($entry in $directories.GetEnumerator()) {
  [void]$builder.AppendLine('<Component Id="'+$component+'" Directory="'+$entry.Value+'" Guid="*" Bitness="always64"><RemoveFolder Id="'+(Id ('remove/'+$entry.Key))+'" On="uninstall"/><RegistryValue Root="HKCU" Key="Software\NullTV\Installer\Folders" Name="'+$component+'" Type="integer" Value="1" KeyPath="yes"/></Component>')
 }
 [void]$builder.AppendLine('<Component Id="StartMenuEntry" Directory="AppMenuFolder" Guid="*" Bitness="always64"><Shortcut Id="NullTVShortcut" Name="NullTV" Description="Native Windows ARM64 television and media player" Target="[INSTALLFOLDER]NullTV.exe" WorkingDirectory="INSTALLFOLDER" Icon="NullTVIcon"/><RemoveFolder Id="RemoveAppMenu" On="uninstall"/><RegistryValue Root="HKCU" Key="Software\NullTV\Installer" Name="Installed" Type="integer" Value="1" KeyPath="yes"/></Component>')
-[void]$builder.AppendLine('<Feature Id="Complete" Title="NullTV" Level="1"><ComponentRef Id="StartMenuEntry"/>')
+[void]$builder.AppendLine('<Component Id="UpdateRegistration" Directory="INSTALLFOLDER" Guid="*" Bitness="always64"><RegistryValue Root="HKCU" Key="Software\NullTV\Installer" Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes"/></Component>')
+[void]$builder.AppendLine('<Feature Id="Complete" Title="NullTV" Level="1"><ComponentRef Id="StartMenuEntry"/><ComponentRef Id="UpdateRegistration"/>')
 foreach($component in $components) { [void]$builder.AppendLine('<ComponentRef Id="'+$component+'"/>') }
 & (Join-Path $PSScriptRoot 'create-setup-assets.ps1') -OutputDirectory $stage
 [void]$builder.AppendLine('</Feature><ui:WixUI Id="WixUI_Minimal"/><WixVariable Id="WixUILicenseRtf" Value="'+(Xml (Join-Path $stage 'license.rtf'))+'"/><WixVariable Id="WixUIDialogBmp" Value="'+(Xml (Join-Path $stage 'setup-dialog.bmp'))+'"/><WixVariable Id="WixUIBannerBmp" Value="'+(Xml (Join-Path $stage 'setup-banner.bmp'))+'"/></Package></Wix>')

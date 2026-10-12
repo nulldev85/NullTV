@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — 2026-10-12
+
+- Added a dedicated Now Playing tab for live, movies, episodes and media-server playback. Guide retains its native preview; Live TV and Movies & Series are browsing views. Navigation shares the existing video session; Back to guide/library returns to browsing.
+- Added a Dracula update dialog with installed/available versions, release notes, download progress/cancellation and a confirmed restart/update action. Startup checks run at most daily; Settings provides manual checks and an automatic-check preference.
+- Stable releases come from the public NullTV-updates repository. A pinned ECDSA P-256 key authenticates exact release metadata; downloads verify SHA-256/length, MSI product family/version, ARM64 architecture and transactional rollback ordering. No GitHub credentials are embedded in the app.
+- Added a separate bundled ARM64 updater helper, save-before-exit/relaunch behavior, read-sharing installer locks and recoverable update-result messages. The MSI registers its install directory and removes old versions inside the upgrade transaction so a failed installation restores them.
+- Added maintainer signing/publication tooling and release documentation. Source pushes and CI artifacts do not automatically publish updates.
+
 ## 0.4.2 — 2026-10-12
 
 - Reduced video overlay button, text and padding sizes. Controls now form a centered panel fitted to their contents; stream information also sizes to its text. Both use translucent Dracula surfaces over a transparent composition backdrop, with hover visibility retained.

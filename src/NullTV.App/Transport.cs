@@ -134,10 +134,11 @@ public sealed partial class MainWindow
             host.Visibility=playing?.Kind==MediaKind.Live && surface!=null && active.ContainsKey(surface) ? Visibility.Collapsed : Visibility.Visible;
             if(emptyPlayerMode=="guide") return; emptyPlayerMode="guide"; host.Children.Clear();
             var title=Text("Select a channel to preview",14); title.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; title.TextAlignment=TextAlignment.Center;
-            var detail=Text("Click a channel name below",11); detail.Opacity=.6; detail.TextAlignment=TextAlignment.Center;
+            var detail=Text("Click a channel or its live program below",11); detail.Opacity=.6; detail.TextAlignment=TextAlignment.Center;
             var placeholder=Stack(new FontIcon { Glyph="\uE714",FontSize=26,Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#BD93F9")) },title,detail); placeholder.VerticalAlignment=VerticalAlignment.Center; placeholder.HorizontalAlignment=HorizontalAlignment.Center; host.Children.Add(placeholder); host.Visibility=playing?.Kind==MediaKind.Live && surface!=null && active.ContainsKey(surface) ? Visibility.Collapsed : Visibility.Visible; return;
         }
+        host.Visibility=surface!=null && active.ContainsKey(surface) ? Visibility.Collapsed : Visibility.Visible;
         var mode=lastPlayed?.Id??(items.Any(i=>i.Kind==MediaKind.Live) ? "channels" : "source"); if(mode==emptyPlayerMode) return; emptyPlayerMode=mode; host.Children.Clear();
-        host.Children.Add(lastPlayed is { } last ? EmptyState("\uE768","Ready when you are.",last.Name,"Play again",()=>PlayAsync(last)) : mode=="channels" ? EmptyState("\uE714","Choose what to watch.","Pick a channel from the list, or find one with search.","Show channels",()=> { channelsHidden=false; UpdateLiveLayout(); return Task.CompletedTask; }) : EmptyState("\uE714","Your screen. Your television.","Add your own account or playlist to get started.","Add a source",()=>EditSourceAsync(null)));
+        host.Children.Add(lastPlayed is { } last ? EmptyState("\uE768","Ready when you are.",last.Name,"Play again",()=>PlayAsync(last)) : mode=="channels" ? EmptyState("\uE714","Choose what to watch.","Browse live channels or your movie library to start playing.","Browse channels",()=> { Navigate("Live TV"); return Task.CompletedTask; }) : EmptyState("\uE714","Your screen. Your television.","Add your own account or playlist to get started.","Add a source",()=>EditSourceAsync(null)));
     }
 }

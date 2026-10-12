@@ -28,6 +28,7 @@ public sealed partial class MainWindow
     private bool compactVideoControls;
     private Grid? playerStage;
     private Grid? libraryPlaybackHeading;
+    private Button? backToBrowse;
     private UIElement? categoryRail,channelsCard,controlsCard;
     private Grid? playerControls;
     private PlayerOverlay? playerOverlay;
@@ -51,13 +52,13 @@ public sealed partial class MainWindow
         livePage.ColumnDefinitions.Add(new() { Width=new(140) }); livePage.ColumnDefinitions.Add(new() { Width=new(304) }); livePage.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
         actions.Children.Add(IconButton("\uE700","Toggle app navigation",ToggleNavigation));
-        actions.Children.Add(IconButton("\uE8A4","Toggle channel pane",ToggleChannelPane));
+        actions.Children.Add(IconButton("\uE8A4","Toggle categories",ToggleChannelPane));
         actions.Children.Add(AsyncButton("+  Add source",()=>EditSourceAsync(null)));
         liveHeading=Heading("Live TV","Find something worth watching.",actions); Grid.SetColumnSpan(liveHeading,3); Place(livePage,liveHeading);
         var movieActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
         movieActions.Children.Add(IconButton("\uE700","Toggle app navigation",ToggleNavigation));
-        movieActions.Children.Add(Button("Back to library",()=> { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); Navigate("Movies & Series"); }));
-        libraryPlaybackHeading=Heading("Now playing","Movies & series",movieActions); libraryPlaybackHeading.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(libraryPlaybackHeading,3); Place(livePage,libraryPlaybackHeading);
+        backToBrowse=Button("Back to browse",()=> { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); Navigate(playbackOrigin); }); movieActions.Children.Add(backToBrowse);
+        libraryPlaybackHeading=Heading("Now playing","Your current stream. One player.",movieActions); libraryPlaybackHeading.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(libraryPlaybackHeading,3); Place(livePage,libraryPlaybackHeading);
         categoryList=new ListView { SelectionMode=ListViewSelectionMode.Single }; QuietItems(categoryList);
         categoryList.SelectionChanged+=(_,_)=> { filter=categoryList.SelectedItem as string??"All channels"; _=GuardAsync(FilterLiveAsync); };
         var categories=new Grid { RowSpacing=12 }; categoryRail=categories; categories.RowDefinitions.Add(new() { Height=GridLength.Auto }); categories.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); var catsTitle=Text("BROWSE",10); catsTitle.Opacity=.45; catsTitle.CharacterSpacing=120; Place(categories,catsTitle); Place(categories,categoryList,1); Place(livePage,categories,1);
@@ -148,15 +149,16 @@ public sealed partial class MainWindow
     }
     private void UpdateLiveLayout()
     {
-        if(livePage==null || fullscreen) return; var available=pageHost.ActualWidth>0 ? pageHost.ActualWidth : 1000; var hasChannels=!libraryNowPlaying && !channelsHidden && !expandedVideo && items.Any(i=>i.Kind==MediaKind.Live);
-        livePage.ColumnSpacing=hasChannels ? 16 : 0;
-        livePage.ColumnDefinitions[0].Width=new(hasChannels && available>=1220 ? 140 : 0); livePage.ColumnDefinitions[1].Width=new(hasChannels ? 304 : 0);
-        if(categoryRail!=null) categoryRail.Visibility=hasChannels && available>=1220 ? Visibility.Visible : Visibility.Collapsed;
-        if(channelsCard!=null) channelsCard.Visibility=hasChannels ? Visibility.Visible : Visibility.Collapsed;
-        if(playerStage!=null) { Grid.SetColumn(playerStage,hasChannels ? 2 : 0); Grid.SetColumnSpan(playerStage,hasChannels ? 1 : 3); }
-        if(categoryPicker!=null) categoryPicker.Visibility=available>=1220 ? Visibility.Collapsed : Visibility.Visible;
-        if(liveHeading!=null) liveHeading.Visibility=expandedVideo || libraryNowPlaying ? Visibility.Collapsed : Visibility.Visible;
-        if(libraryPlaybackHeading!=null) libraryPlaybackHeading.Visibility=libraryNowPlaying && !expandedVideo ? Visibility.Visible : Visibility.Collapsed;
+        if(livePage==null || fullscreen) return; var available=pageHost.ActualWidth>0 ? pageHost.ActualWidth : 1000; var browse=currentTab=="Live TV"; var categories=browse && !channelsHidden && available>=900;
+        livePage.ColumnSpacing=categories ? 16 : 0;
+        livePage.ColumnDefinitions[0].Width=new(categories ? 140 : 0); livePage.ColumnDefinitions[1].Width=browse ? new(1,GridUnitType.Star) : new(0); livePage.ColumnDefinitions[2].Width=browse ? new(0) : new(1,GridUnitType.Star);
+        if(categoryRail!=null) categoryRail.Visibility=categories ? Visibility.Visible : Visibility.Collapsed;
+        if(channelsCard is FrameworkElement channelsPane) { channelsPane.Visibility=browse ? Visibility.Visible : Visibility.Collapsed; Grid.SetColumn(channelsPane,1); Grid.SetColumnSpan(channelsPane,2); }
+        if(playerStage!=null) { playerStage.Visibility=browse ? Visibility.Collapsed : Visibility.Visible; Grid.SetColumn(playerStage,0); Grid.SetColumnSpan(playerStage,3); }
+        if(categoryPicker!=null) categoryPicker.Visibility=browse && !categories ? Visibility.Visible : Visibility.Collapsed;
+        if(liveHeading!=null) liveHeading.Visibility=browse ? Visibility.Visible : Visibility.Collapsed;
+        if(libraryPlaybackHeading!=null) libraryPlaybackHeading.Visibility=currentTab=="Now Playing" && !expandedVideo ? Visibility.Visible : Visibility.Collapsed;
+        if(backToBrowse!=null) backToBrowse.Content=playbackOrigin=="Guide" ? "Back to guide" : playbackOrigin=="Movies & Series" ? "Back to library" : "Browse channels";
         if(playerControls!=null) playerControls.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(controlsCard!=null) controlsCard.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(liveSummary!=null) liveSummary.Text=$"CHANNELS  ·  {items.Count(i=>i.Kind==MediaKind.Live):N0}";
@@ -188,8 +190,9 @@ public sealed partial class MainWindow
         if(request.IsCancellationRequested) return;
         await SaveProgressAsync(); await SyncStoppedAsync();
         var inGuide=currentTab=="Guide" && item.Kind==MediaKind.Live;
+        if(currentTab is "Guide" or "Live TV" or "Movies & Series") playbackOrigin=currentTab;
         if((item.Kind!=MediaKind.Live || inGuide) && multi) ToggleMulti();
-        if(!inGuide) Navigate(item.Kind==MediaKind.Live ? "Live TV" : "Movies & Series",item.Kind!=MediaKind.Live);
+        if(!inGuide) Navigate("Now Playing");
         if(surface==null) return;
         if(request.IsCancellationRequested) return;
         await surface.InitializeAsync(); if(request.IsCancellationRequested) return; playing=item; lastPlayed=item; behindLive=false; infoUpdated=default; if(streamInfo!=null) streamInfo.Text="Waiting for stream information…"; if(item.Kind!=MediaKind.Live) channelsHidden=true; active[surface]=item; retries[surface]=0; generations[surface]=generations.GetValueOrDefault(surface)+1;
@@ -221,7 +224,7 @@ public sealed partial class MainWindow
         await store.SaveAsync(settings);
     }
     private void StopPlayback() { playerOverlay?.Hide(); playbackRequest?.Cancel(); _=GuardAsync(SyncStoppedAsync); foreach(var v in surfaces) { generations[v]=generations.GetValueOrDefault(v)+1; v.Player?.Command("stop"); v.Hide(true); } pipWindow?.Close(); active.Clear(); playing=null; if(emptyLive!=null) emptyLive.Visibility=Visibility.Visible; if(playingTitle!=null) { playingTitle.Text="PLAYER"; playingTitle.FontSize=10; playingTitle.Opacity=.5; playingTitle.CharacterSpacing=100; } if(playingInfo!=null) playingInfo.Text=""; UpdateLiveLayout(); status.Text="Playback stopped."; }
-    private void ChannelStep(int step) { var list=currentTab=="Guide" ? FavoriteGuide.Channels(items,settings.Profile).ToList() : (channelList?.ItemsSource as IEnumerable<ChannelRow>)?.Select(r=>r.Item).ToList()??[]; if(list.Count==0) return; var index=list.FindIndex(i=>i.Id==playing?.Id); _=GuardAsync(()=>PlayAsync(list[(index+step+list.Count)%list.Count])); }
+    private void ChannelStep(int step) { var list=currentTab=="Guide" || playbackOrigin=="Guide" ? FavoriteGuide.Channels(items,settings.Profile).ToList() : (channelList?.ItemsSource as IEnumerable<ChannelRow>)?.Select(r=>r.Item).ToList()??[]; if(list.Count==0) return; var index=list.FindIndex(i=>i.Id==playing?.Id); _=GuardAsync(()=>PlayAsync(list[(index+step+list.Count)%list.Count])); }
     private void UpdateLive()
     {
         if(categoryList==null) return;

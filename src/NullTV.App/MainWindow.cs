@@ -30,8 +30,8 @@ public sealed partial class MainWindow : Window
     private readonly TextBlock profileLabel=new();
     private Grid? livePage;
     private string currentTab="Live TV";
-    private bool libraryNowPlaying;
-    private bool IsPlayerVisible=>currentTab=="Live TV" || currentTab=="Movies & Series" && libraryNowPlaying || currentTab=="Guide" && playing?.Kind==MediaKind.Live;
+    private string playbackOrigin="Live TV";
+    private bool IsPlayerVisible=>currentTab=="Now Playing" || currentTab=="Guide" && playing?.Kind==MediaKind.Live;
     private readonly DispatcherTimer timer=new() { Interval=TimeSpan.FromSeconds(1) };
     private int ticks;
     private bool busy;
@@ -61,7 +61,7 @@ public sealed partial class MainWindow : Window
         Grid.SetColumnSpan(titlebar,2); root.Children.Add(titlebar); SetTitleBar(titlebar);
         navigation.Margin=new Thickness(12,20,12,0);
         var label=Text("LIBRARY",10); label.CharacterSpacing=150; label.Opacity=.4; label.Margin=new Thickness(14,0,0,16); navigation.Children.Add(label);
-        var names=new[] { "Live TV","Guide","Movies & Series","Media Servers","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE968","\uE713" };
+        var names=new[] { "Live TV","Guide","Movies & Series","Now Playing","Media Servers","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE768","\uE968","\uE713" };
         for(int i=0;i<names.Length;i++) { var name=names[i]; var b=Button(name,()=>Navigate(name)); b.Tag=name; b.Content=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,Children={ new FontIcon { Glyph=glyphs[i],FontSize=17 },new TextBlock { Text=name=="Movies & Series" ? "Movies & series" : name,FontSize=13,VerticalAlignment=VerticalAlignment.Center } } }; b.HorizontalAlignment=HorizontalAlignment.Stretch; b.HorizontalContentAlignment=HorizontalAlignment.Left; b.Padding=new Thickness(14,12,10,12); b.MinHeight=48; navigation.Children.Add(b); }
         var rail=new Grid(); rail.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); rail.RowDefinitions.Add(new() { Height=GridLength.Auto }); Place(rail,navigation);
         var railFooter=Stack(Text("YOUR SCREEN.\nYOUR SOURCES.",10)); railFooter.Opacity=.35; railFooter.Margin=new Thickness(26,16,16,24); Place(rail,railFooter,1);
@@ -74,7 +74,7 @@ public sealed partial class MainWindow : Window
         Content=root;
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1440,960));
         AppWindow.Changed+=(_,_)=> { foreach(var tile in surfaces) tile.Hide(!IsPlayerVisible || !AppWindow.IsVisible || dialogDepth>0 || !active.ContainsKey(tile)); };
-        Closed+=(_,_)=> { closed=true; lifetime.Cancel(); timer.Stop(); transportTimer.Stop(); filterPending?.Cancel(); playerOverlay?.Dispose(); foreach(var s in surfaces) s.Dispose(); pipWindow?.Close(); _=store.SaveAsync(settings); http.Dispose(); };
+        Closed+=(_,_)=> { closed=true; lifetime.Cancel(); timer.Stop(); transportTimer.Stop(); filterPending?.Cancel(); playerOverlay?.Dispose(); foreach(var s in surfaces) s.Dispose(); pipWindow?.Close(); _=store.SaveAsync(settings); http.Dispose(); updateHttp.Dispose(); };
         AppWindow.Closing+=async (_,e)=> { if(closingConfirmed) { playerOverlay?.Dispose(); return; } e.Cancel=true; timer.Stop(); await GuardAsync(SaveProgressAsync); closingConfirmed=true; Close(); };
         root.Loaded+=async (_,_)=>await GuardAsync(InitializeAsync);
         timer.Tick+=async (_,_)=>await TickAsync();
@@ -101,6 +101,7 @@ public sealed partial class MainWindow : Window
         {
             var end=new DispatcherTimer { Interval=TimeSpan.FromSeconds(seconds) }; end.Tick+=async (_,_)=> { end.Stop(); Directory.CreateDirectory(store.DirectoryPath); await File.WriteAllTextAsync(Path.Combine(store.DirectoryPath,"ui-validation.json"),System.Text.Json.JsonSerializer.Serialize(new { View=currentTab,Passed=!validationFailed,Width=root.ActualWidth,Height=root.ActualHeight,NativePlayer=surface?.Player!=null,PlaybackLoads=validationPlaybackLoads,DesignResources=Application.Current.Resources.ContainsKey("NullTVButtonStyle") && File.Exists(Path.Combine(AppContext.BaseDirectory,"DesignResources.xbf")),Architecture=System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString() })); closingConfirmed=true; await store.SaveAsync(settings); Close(); }; end.Start();
         }
+        _=InitializeUpdatesAsync();
     }
     private void ApplyAppearance()
     {
@@ -155,7 +156,7 @@ public sealed partial class MainWindow : Window
     private static ComboBox Choice(string label,IEnumerable<string> values,string selected) { var c=new ComboBox { Header=string.IsNullOrWhiteSpace(label) ? null : label,MinHeight=string.IsNullOrWhiteSpace(label) ? 46 : 68,HorizontalAlignment=HorizontalAlignment.Stretch }; PolishField(c); foreach(var v in values) c.Items.Add(v); c.SelectedItem=selected; if(c.SelectedIndex<0 && c.Items.Count>0) c.SelectedIndex=0; return c; }
     private static ToggleSwitch Toggle(string label,bool value) => new() { Header=label,IsOn=value,MinHeight=44 };
     private ScrollViewer Scroll(UIElement element) => new() { Content=element,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
-    private void Navigate(string tab,bool nowPlaying=false)
+    private void Navigate(string tab)
     {
         if(currentTab=="Guide" && tab=="Guide" && guidePage!=null) return;
         if(currentTab=="Guide")
@@ -166,10 +167,11 @@ public sealed partial class MainWindow : Window
             root.ColumnDefinitions[0].Width=new(navigationHidden ? 0 : 184);
             guidePage=null; guidePreview=null; guideVideoExpanded=null; selectGuideChannel=null; refreshGuide=null;
         }
-        currentTab=tab; libraryNowPlaying=tab=="Movies & Series" && nowPlaying; playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible);
+        if(currentTab!="Guide" && tab!=currentTab) { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); }
+        currentTab=tab; playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s));
         foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .65; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); }
         foreach(var child in pageHost.Children) child.Visibility=Visibility.Collapsed;
-        if(tab=="Live TV" || libraryNowPlaying) { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!active.ContainsKey(s)); UpdateLiveLayout(); return; }
+        if(tab is "Live TV" or "Now Playing") { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s)); UpdateLiveLayout(); return; }
         // Other pages are rebuilt to reflect profile and settings changes.
         foreach(var child in pageHost.Children.Where(c=>c!=livePage).ToArray()) pageHost.Children.Remove(child);
         pageHost.Children.Add(tab switch { "Guide"=>BuildGuide(), "Movies & Series"=>BuildLibrary(), "Media Servers"=>BuildServers(), _=>BuildSettings() });

@@ -23,10 +23,13 @@ Assert-Arm64 (Join-Path $root 'native/libmpv-2.dll')
 if(!$SkipTests) { Run-Dotnet @('run','--project','tests/NullTV.Tests','-c',$Configuration) }
 $publish=Join-Path $root 'artifacts/NullTV-win-arm64'
 Run-Dotnet @('publish','src/NullTV.App','-c',$Configuration,'-r','win-arm64','-p:Platform=ARM64','--self-contained','true','-o',$publish)
+Run-Dotnet @('publish','src/NullTV.Update','-c',$Configuration,'-r','win-arm64','--self-contained','true','-o',(Join-Path $root 'artifacts/update-helper'))
+Copy-Item -LiteralPath (Join-Path $root 'artifacts/update-helper/NullTV.Update.exe') -Destination $publish -Force
 Assert-Arm64 (Join-Path $publish 'NullTV.exe')
 Assert-Arm64 (Join-Path $publish 'coreclr.dll')
 Assert-Arm64 (Join-Path $publish 'Microsoft.UI.Xaml.dll')
 Assert-Arm64 (Join-Path $publish 'libmpv-2.dll')
+Assert-Arm64 (Join-Path $publish 'NullTV.Update.exe')
 foreach($name in @('README.md','LICENSE','THIRD-PARTY-NOTICES.md','CHANGELOG.md','FEATURES.md')) { Copy-Item -LiteralPath (Join-Path $root $name) -Destination $publish -Force }
 $zip=Join-Path $root 'artifacts/NullTV-win-arm64.zip'
 Compress-Archive -Path $publish -DestinationPath $zip -Force

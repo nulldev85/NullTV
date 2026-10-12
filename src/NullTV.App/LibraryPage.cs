@@ -18,7 +18,7 @@ public sealed partial class MainWindow
         if(libraryProfile!=settings.Profile.Id) { libraryProfile=settings.Profile.Id; librarySearchText=""; libraryMode="All"; libraryCategory="All categories"; }
         var page=new Grid { RowSpacing=18 }; page.RowDefinitions.Add(new() { Height=GridLength.Auto }); page.RowDefinitions.Add(new() { Height=GridLength.Auto }); page.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
-        if((playing??lastPlayed)?.Kind is MediaKind.Movie or MediaKind.Episode) actions.Children.Add(Button("Now playing",()=>Navigate("Movies & Series",true)));
+        if((playing??lastPlayed)?.Kind is MediaKind.Movie or MediaKind.Episode) actions.Children.Add(Button("Now playing",()=>Navigate("Now Playing")));
         actions.Children.Add(AsyncButton("+  Add source",()=>EditSourceAsync(null))); Place(page,Heading("Movies & series","Your library. Ready when you are.",actions));
         var search=SearchBox("Search your library"); search.Width=320; search.Text=librarySearchText;
         var kind=Choice("",new[]{"All","Movies","Series","Continue watching","Watched"},libraryMode); kind.MinWidth=160;

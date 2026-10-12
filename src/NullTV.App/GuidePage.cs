@@ -198,7 +198,8 @@ public sealed partial class MainWindow
                 if(selectedShow==null)
                 {
                     var available=found.SelectMany(row=>row.Shows.Select(show=>(row.Channel,Show:show))).ToArray();
-                    var first=available.FirstOrDefault(pair=>pair.Show.Start<=DateTimeOffset.Now && pair.Show.End>DateTimeOffset.Now);
+                    var first=available.FirstOrDefault(pair=>pair.Channel.Id==playing?.Id && pair.Show.Start<=DateTimeOffset.Now && pair.Show.End>DateTimeOffset.Now);
+                    if(first.Show==null) first=available.FirstOrDefault(pair=>pair.Show.Start<=DateTimeOffset.Now && pair.Show.End>DateTimeOffset.Now);
                     if(first.Show==null) first=available.FirstOrDefault();
                     if(first.Show!=null) SelectProgramme(first.Channel,first.Show);
                     else if(found.Count>0) { selectedChannel=found[0].Channel; infoContext.Text=$"CHANNEL  ·  {selectedChannel.Number:000}  {selectedChannel.Name}"; infoContext.Foreground=FieldText(); infoTitle.Text="Schedule unavailable"; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Click the channel name to preview it here. Your favorite stays in the guide while program information is unavailable."; }

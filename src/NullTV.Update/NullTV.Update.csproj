@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0</TargetFramework><AssemblyName>NullTV.Update</AssemblyName><RuntimeIdentifier>win-arm64</RuntimeIdentifier><PlatformTarget>ARM64</PlatformTarget><SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract><EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><DebugType>None</DebugType></PropertyGroup>
+<ItemGroup><ProjectReference Include="../NullTV.Core/NullTV.Core.csproj"/></ItemGroup>
+</Project>

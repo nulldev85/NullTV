@@ -77,6 +77,9 @@ public sealed class Settings
     public AppearanceSettings Appearance { get; set; } = new();
     public string StartupTab { get; set; } = "Live TV";
     public bool ResumeOnLaunch { get; set; }
+    public bool CheckUpdatesOnStartup { get; set; }=true;
+    public DateTimeOffset LastUpdateCheckUtc { get; set; }
+    public string DismissedUpdateVersion { get; set; }="";
     public int LockTimeoutMinutes { get; set; } = 10;
     public Dictionary<string, string> Keymap { get; set; } = new() { ["Space"]="Pause", ["F"]="Fullscreen", ["Up"]="Previous", ["Down"]="Next", ["M"]="Mute" };
     [JsonIgnore] public Profile Profile => Profiles.FirstOrDefault(p => p.Id == CurrentProfileId) ?? Profiles[0];

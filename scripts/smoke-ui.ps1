@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $Executable=(Resolve-Path -LiteralPath $Executable).Path
 if(!$DataRoot) { $DataRoot=Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/ui-validation' }
 $reports=@()
-foreach($tab in @('Live TV','Guide','Movies & Series','Media Servers','Settings')) {
+foreach($tab in @('Live TV','Guide','Movies & Series','Now Playing','Media Servers','Settings')) {
  $dir=Join-Path $DataRoot ($tab.Replace(' ','-').Replace('&','and')+'-'+[Guid]::NewGuid().ToString('N'))
  $process=Start-Process -FilePath $Executable -ArgumentList @('--data-dir',('"'+$dir+'"'),'--smoke-tab',('"'+$tab+'"'),'--smoke-seconds','3') -WindowStyle Hidden -PassThru
  if(!$process.WaitForExit(20000)) { throw "UI validation timed out: $tab" }
