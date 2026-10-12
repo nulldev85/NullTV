@@ -18,6 +18,12 @@ Test("M3U cancellation",async ()=> { using var c=new CancellationTokenSource(); 
 Test("M3U 50,000 streaming entries",async ()=> { var text=new StringBuilder("#EXTM3U\n"); for(int i=0;i<50000;i++) text.Append($"#EXTINF:-1 tvg-id=\"c{i}\" group-title=\"Large\",Channel {i}\nhttps://fixture.invalid/{i}\n"); var watch=Stopwatch.StartNew(); var list=await Parse(text.ToString()); Check(list.Count==50000); Console.WriteLine($"  50,000 parsed in {watch.ElapsedMilliseconds} ms; IDs unique: {list.Select(i=>i.Id).Distinct().Count()}"); });
 Test("XMLTV offsets and filtering",async ()=> { var xml="<tv><programme channel='id' start='20261011120000 +0530' stop='20261011130000 +0530'><title>Fixture</title><desc>Details</desc></programme><programme channel='bad' start='garbage' stop='garbage'/></tv>"; var result=await XmlTvParser.ParseAsync(new MemoryStream(Encoding.UTF8.GetBytes(xml)),new(2026,10,10,0,0,0,TimeSpan.Zero),new(2026,10,12,0,0,0,TimeSpan.Zero)); Check(result.Count==1 && result[0].Start.UtcDateTime.Hour==6 && result[0].Start.UtcDateTime.Minute==30 && result[0].Description=="Details"); });
 Test("XMLTV rejects DTD entities",async ()=> { try { await XmlTvParser.ParseAsync(new MemoryStream(Encoding.UTF8.GetBytes("<!DOCTYPE tv [<!ENTITY x SYSTEM 'file:///private'>]><tv/>")),DateTimeOffset.MinValue,DateTimeOffset.MaxValue); throw new Exception("DTD accepted"); } catch(System.Xml.XmlException) { } });
+Test("XMLTV guide metadata and episode numbering",async ()=> {
+ var xml="<tv><programme channel='id' start='20261011120000 +0000' stop='20261011130000 +0000'><title>Fixture</title><sub-title>Episode title</sub-title><desc>Synopsis</desc><category>Drama</category><category>Drama</category><rating system='TV'><value>PG</value></rating><episode-num system='xmltv_ns'>0.3.</episode-num><new/></programme></tv>";
+ var result=await XmlTvParser.ParseAsync(new MemoryStream(Encoding.UTF8.GetBytes(xml)),DateTimeOffset.MinValue,DateTimeOffset.MaxValue); var show=result.Single();
+ Check(show.Subtitle=="Episode title" && show.Category=="Drama" && show.Rating=="TV PG" && show.Episode=="S1 · E4" && show.IsNew && !show.IsRepeat);
+ var restored=JsonSerializer.Deserialize<Programme>(JsonSerializer.Serialize(show))!; Check(restored==show);
+});
 Test("XMLTV invalid timezone rejected",()=> { Check(!XmlTvParser.TryTime("20261011120000 +1460",out _) && !XmlTvParser.TryTime("20261011120000 +1500",out _)); return Task.CompletedTask; });
 Test("Xtream fixture catalog and credentials encoding",async ()=> { using var http=new HttpClient(new FixtureHandler()); var s=new Source { Id="fixture",Address="https://fixture.invalid",Username="a/b",Password="p &?" }; var c=await new XtreamClient(http).LoadAsync(s); Check(c.Items.Count==1 && c.Status=="Active" && c.Items[0].ArchiveDays==7 && c.Items[0].Url.Contains("a%2Fb/p%20%26%3F/7.ts")); Check(XtreamClient.ApiUri(s).Query.Contains("password=p%20%26%3F")); });
 Test("Xtream account denial",async ()=> { using var http=new HttpClient(new FixtureHandler(true)); try { await new XtreamClient(http).LoadAsync(new Source { Address="https://fixture.invalid" }); throw new Exception("Denied account accepted"); } catch(InvalidDataException) { } });
@@ -28,6 +34,31 @@ Test("Encrypted backup round trip",()=> { var s=new Settings(); s.Profile.Source
 Test("Encrypted backup tamper and wrong password",()=> { var b=SettingsStore.Backup(new(),"long fixture password"); try { SettingsStore.Restore(b,"wrong password"); throw new Exception("Wrong password accepted"); } catch(System.Security.Cryptography.CryptographicException) { } b[^1]^=1; try { SettingsStore.Restore(b,"long fixture password"); throw new Exception("Tamper accepted"); } catch(System.Security.Cryptography.CryptographicException) { } return Task.CompletedTask; });
 if(OperatingSystem.IsWindows()) Test("DPAPI settings round trip",async ()=> { var dir=Path.Combine(Path.GetTempPath(),"NullTV-test-"+Guid.NewGuid().ToString("N")); var store=new SettingsStore(dir); var s=new Settings(); s.Profile.Sources.Add(new() { Password="synthetic-secret" }); await store.SaveAsync(s); Check((await store.LoadAsync()).Profile.Sources[0].Password=="synthetic-secret"); Check(!Encoding.UTF8.GetString(await File.ReadAllBytesAsync(Path.Combine(dir,"settings.dat"))).Contains("synthetic-secret")); Directory.Delete(dir,true); });
 int failed=0;
+Test("Favorite guide migrates old profiles and excludes VOD/nonfavorites",()=> {
+ var legacy=JsonSerializer.Deserialize<Profile>("{\"Favorites\":[\"a\",\"c\",\"movie\"]}")!;
+ var catalog=new[] { new MediaItem("a","s","One","",MediaKind.Live,""),new MediaItem("b","s","Two","",MediaKind.Live,""),new MediaItem("c","s","Three","",MediaKind.Live,""),new MediaItem("movie","s","Movie","",MediaKind.Movie,"") };
+ Check(legacy.FavoriteGuideOrder.Count==0 && FavoriteGuide.Channels(catalog,legacy).Select(x=>x.Id).SequenceEqual(new[]{"a","c"}));
+ legacy.FavoriteGuideOrder=["c","c","gone","a"]; Check(FavoriteGuide.Channels(catalog,legacy).Select(x=>x.Id).SequenceEqual(new[]{"c","a"})); return Task.CompletedTask;
+});
+Test("Filtered guide reorder preserves hidden channels and new favorites",()=> {
+ var catalog=Enumerable.Range(0,5).Select(n=>new MediaItem(n.ToString(),"s","Channel "+n,"",MediaKind.Live,"")).ToArray();
+ var profile=new Profile { Favorites=["0","1","2","3","4"],FavoriteGuideOrder=["0","1","2","3"] };
+ FavoriteGuide.SaveOrder(profile,catalog,["3","1","foreign","3"]);
+ Check(profile.FavoriteGuideOrder.SequenceEqual(new[]{"0","3","2","1","4"})); Check(profile.Favorites.SetEquals(new[]{"0","1","2","3","4"})); return Task.CompletedTask;
+});
+Test("Guide order handles unavailable channels and isolates profiles",()=> {
+ var catalog=new[]{new MediaItem("a","s","A","",MediaKind.Live,""),new MediaItem("b","s","B","",MediaKind.Live,"")};
+ var profile=new Profile { Favorites=["a","b","offline"],FavoriteGuideOrder=["offline","a","removed","b"] };
+ var other=new Profile { Favorites=["a","b"],FavoriteGuideOrder=["a","b"] };
+ FavoriteGuide.SaveOrder(profile,catalog,["b","a"]);
+ Check(profile.FavoriteGuideOrder.SequenceEqual(new[]{"b","a","offline"})); Check(other.FavoriteGuideOrder.SequenceEqual(new[]{"a","b"}));
+ var refreshed=catalog.Append(new MediaItem("offline","s","Restored","",MediaKind.Live,"")).Reverse(); Check(FavoriteGuide.Channels(refreshed,profile).Select(x=>x.Id).SequenceEqual(new[]{"b","a","offline"})); return Task.CompletedTask;
+});
+if(OperatingSystem.IsWindows()) Test("Encrypted favorite guide order survives restart",async ()=> {
+ var dir=Path.Combine(Path.GetTempPath(),"NullTV-order-test-"+Guid.NewGuid().ToString("N"));
+ try { var settings=new Settings(); settings.Profile.Favorites=["a","b","c"]; settings.Profile.FavoriteGuideOrder=["c","a","b"]; await new SettingsStore(dir).SaveAsync(settings); var loaded=await new SettingsStore(dir).LoadAsync(); Check(loaded.Profile.FavoriteGuideOrder.SequenceEqual(new[]{"c","a","b"}) && loaded.Profile.Favorites.SetEquals(settings.Profile.Favorites)); var restored=SettingsStore.Restore(SettingsStore.Backup(loaded,"long fixture password"),"long fixture password"); Check(restored.Profile.FavoriteGuideOrder.SequenceEqual(loaded.Profile.FavoriteGuideOrder)); }
+ finally { if(Directory.Exists(dir)) Directory.Delete(dir,true); }
+});
 if(OperatingSystem.IsWindows()) Test("Encrypted guide survives restart and damaged cache recovers",async ()=> { var dir=Path.Combine(Path.GetTempPath(),"NullTV-guide-test-"+Guid.NewGuid().ToString("N")); var store=new SettingsStore(dir); var guide=new List<Programme> { new("channel","Synthetic private title","",DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddHours(1)) }; try { await store.SaveGuideAsync("fixture",guide); var restored=await new SettingsStore(dir).LoadGuideAsync("fixture"); Check(restored?.SequenceEqual(guide)==true); var file=Path.Combine(dir,"cache","fixture.guide"); Check(!Encoding.UTF8.GetString(await File.ReadAllBytesAsync(file)).Contains("Synthetic private title")); await File.WriteAllBytesAsync(file,new byte[]{1,2,3}); Check(await store.LoadGuideAsync("fixture")==null); } finally { if(Directory.Exists(dir)) Directory.Delete(dir,true); } });
 Test("M3U header catchup inheritance and tvg-name",async ()=> { var list=await Parse("#EXTM3U catchup='default' catchup-days='7'\n#EXTINF:-1 tvg-name='Inherited',\nhttps://fixture.invalid/a"); Check(list[0].Name=="Inherited" && list[0].ArchiveDays==7 && list[0].Catchup=="default"); });
 Test("Settings reject path traversal source IDs",()=> { var s=new Settings(); s.Profile.Sources.Add(new() { Id="../../private" }); try { s.Validate(); throw new Exception("Unsafe ID accepted"); } catch(InvalidDataException) { } return Task.CompletedTask; });

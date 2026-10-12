@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-12
+
+- Guide now shows favorite live channels, including channels without programme data. Added logos/numbers, aligned time labels, a current-time marker, airing progress/remaining time, channel-name/programme search, captured drag grips and Move up/Move down actions.
+- Added a programme information panel and full details with synopsis, local times, duration, genre, rating, episode, new/premiere/repeat information and reminders where supplied. XMLTV metadata survives encrypted guide caching; unavailable data is not fabricated.
+- Guide order saves per profile, survives encrypted settings/backup round trips and preserves hidden channels when reordering search results. New favorites append after saved positions; removing a favorite removes its saved position.
+- Movies and episodes open Now Playing within Movies & Series. Back to library and Now playing actions preserve library filters; Live TV remains the destination for live channels.
+- Player visibility, dialog restoration and playback shortcuts now respect the library player.
+- Applied the verified Dracula palette to shared inputs, menus, buttons, cards, dialogs and player controls. Purple actions/focus, yellow favorites/reminders and green live indicators; no cyan chrome. Classic Dracula and true-black Dracula OLED options are available; existing neutral OLED installs migrate to Dracula OLED.
+- Retained the corrected Windows 11 registry prerequisite check and neutral installer artwork from installer 0.2.1.
+
 ## Installer 0.2.1 — 2026-10-12
 
 - Fixed the Windows 11 prerequisite check: use a 64-bit registry search for CurrentBuildNumber instead of MSI's compatibility-dependent WindowsBuild value, which can incorrectly report 9600.

@@ -12,7 +12,7 @@ public sealed partial class MainWindow
     {
         foreach(var key in new[]{"ListViewItemBackgroundPointerOver","ListViewItemBackgroundSelectedPointerOver","GridViewItemBackgroundPointerOver","GridViewItemBackgroundSelectedPointerOver"}) list.Resources[key]=new SolidColorBrush(Colors.Transparent);
         list.Resources["ControlCornerRadius"]=new CornerRadius(10);
-        foreach(var key in new[]{"ListViewItemSelectionIndicatorBrush","ListViewItemSelectionIndicatorPointerOverBrush","ListViewItemSelectionIndicatorPressedBrush"}) list.Resources[key]=new SolidColorBrush(Color("#D3D6DC"));
+        foreach(var key in new[]{"ListViewItemSelectionIndicatorBrush","ListViewItemSelectionIndicatorPointerOverBrush","ListViewItemSelectionIndicatorPressedBrush"}) list.Resources[key]=new SolidColorBrush(Color("#BD93F9"));
     }
     private readonly Dictionary<string,(List<Programme> Source,ProgrammeIndex Index)> guideIndices=[];
     private ProgrammeIndex GuideFor(string sourceId)
@@ -49,14 +49,18 @@ public sealed partial class MainWindow
         UpdateLiveLayout();
     }
     private static bool LightFields=>App.Main?.settings.Appearance.Theme=="Light";
-    private static SolidColorBrush FieldText()=>new(Color(LightFields ? "#202228" : "#F1F2F4"));
-    private static SolidColorBrush FieldFill()=>new(Color(LightFields ? "#FFFFFF" : "#151517"));
-    private static SolidColorBrush FieldStroke()=>new(Color(LightFields ? "#D3D5DA" : "#303035"));
+    private bool IsDracula=>settings.Appearance.Theme.StartsWith("Dracula",StringComparison.Ordinal);
+    private string SurfaceHex=>settings.Appearance.Theme=="Light" ? "#FFFFFF" : settings.Appearance.Theme.Contains("OLED") ? "#191A21" : "#21222C";
+    private string RaisedHex=>settings.Appearance.Theme=="Light" ? "#E8EAEE" : "#343746";
+    private string BorderHex=>settings.Appearance.Theme=="Light" ? "#D3D5DA" : "#44475A";
+    private static SolidColorBrush FieldText()=>new(Color(LightFields ? "#202228" : "#F8F8F2"));
+    private static SolidColorBrush FieldFill()=>new(Color(LightFields ? "#FFFFFF" : "#21222C"));
+    private static SolidColorBrush FieldStroke()=>new(Color(LightFields ? "#D3D5DA" : "#44475A"));
     private static void PolishField(Control control,bool preserveTemplate=false)
     {
         if(!preserveTemplate) control.Style=(Style)Application.Current.Resources[control is ComboBox ? "NullTVComboBoxStyle" : control is PasswordBox ? "NullTVPasswordBoxStyle" : "NullTVTextBoxStyle"];
         control.CornerRadius=new CornerRadius(10); control.FontSize=14; control.Padding=new Thickness(14,11,14,11); control.Background=FieldFill(); control.Foreground=FieldText(); control.BorderBrush=FieldStroke(); control.BorderThickness=new Thickness(1);
-        control.Resources["TextControlForeground"]=FieldText(); control.Resources["TextControlForegroundFocused"]=FieldText(); control.Resources["TextControlForegroundPointerOver"]=FieldText(); control.Resources["TextControlBackgroundFocused"]=FieldFill(); control.Resources["TextControlBorderBrushFocused"]=new SolidColorBrush(Color("#B9BEC7"));
+        control.Resources["TextControlForeground"]=FieldText(); control.Resources["TextControlForegroundFocused"]=FieldText(); control.Resources["TextControlForegroundPointerOver"]=FieldText(); control.Resources["TextControlBackgroundFocused"]=FieldFill(); control.Resources["TextControlBorderBrushFocused"]=new SolidColorBrush(Color("#815CD6"));
         if(control is ComboBox combo)
         {
             combo.ItemContainerStyle=(Style)Application.Current.Resources["NullTVComboBoxItemStyle"];

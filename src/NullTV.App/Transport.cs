@@ -10,7 +10,8 @@ public sealed partial class MainWindow
         private string nowNext="No programme information";
         public string NowNext { get=>nowNext; set { if(nowNext==value) return; nowNext=value; Changed(nameof(NowNext)); } }
         private bool favorite;
-        public bool IsFavorite { get=>favorite; set { if(favorite==value) return; favorite=value; Changed(nameof(FavoriteGlyph)); Changed(nameof(FavoriteLabel)); } }
+        public bool IsFavorite { get=>favorite; set { if(favorite==value) return; favorite=value; Changed(nameof(FavoriteGlyph)); Changed(nameof(FavoriteLabel)); Changed(nameof(FavoriteBrush)); } }
+        public Microsoft.UI.Xaml.Media.Brush FavoriteBrush=>new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? LightFields ? "#A39514" : "#F1FA8C" : LightFields ? "#202228" : "#F8F8F2"));
         public string FavoriteGlyph=>favorite ? "\uE735" : "\uE734";
         public string FavoriteLabel=>$"{(favorite ? "Remove" : "Add")} {Item.Name} {(favorite ? "from" : "to")} favorites";
     }
@@ -48,7 +49,7 @@ public sealed partial class MainWindow
         if(stopButton!=null) { stopButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; stopButton.IsEnabled=running; }
         if(previousButton!=null) previousButton.Visibility=item?.Kind==MediaKind.Live ? Visibility.Visible : Visibility.Collapsed;
         if(nextButton!=null) nextButton.Visibility=item?.Kind==MediaKind.Live ? Visibility.Visible : Visibility.Collapsed;
-        var favorite=item!=null && settings.Profile.Favorites.Contains(item.Id); LabelButton(favoriteButton,favorite ? "\uE735" : "\uE734",favorite ? "Remove from favorites" : "Add to favorites"); if(favoriteButton!=null) favoriteButton.IsEnabled=item!=null;
+        var favorite=item!=null && settings.Profile.Favorites.Contains(item.Id); LabelButton(favoriteButton,favorite ? "\uE735" : "\uE734",favorite ? "Remove from favorites" : "Add to favorites"); if(favoriteButton!=null) { favoriteButton.IsEnabled=item!=null; favoriteButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? "#F1FA8C" : "#F8F8F2")); }
         LabelButton(muteButton,state?.Muted==true ? "\uE74F" : "\uE767",state?.Muted==true ? "Unmute" : "Mute");
         if(progressArea!=null) progressArea.Visibility=playing!=null && !live && state?.Duration>0 ? Visibility.Visible : Visibility.Collapsed;
         if(state!=null)
@@ -63,10 +64,12 @@ public sealed partial class MainWindow
     private async Task ToggleFavoriteAsync(MediaItem item)
     {
         var favorites=settings.Profile.Favorites; if(!favorites.Add(item.Id)) favorites.Remove(item.Id);
+        if(!favorites.Contains(item.Id)) settings.Profile.FavoriteGuideOrder.RemoveAll(id=>id==item.Id);
         foreach(var row in liveRows.Where(r=>r.Item.Id==item.Id)) row.IsFavorite=favorites.Contains(item.Id);
         UpdatePlaybackControls(); if(filter=="Favorites") await FilterLiveAsync();
         status.Text=favorites.Contains(item.Id) ? "Added to favorites." : "Removed from favorites.";
         await store.SaveAsync(settings);
+        if(currentTab=="Guide") refreshGuide?.Invoke();
     }
     private void PrepareChannelFavorite(ListViewBase sender,ContainerContentChangingEventArgs args)
     {

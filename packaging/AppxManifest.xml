@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">
- <Identity Name="NullTV" Publisher="CN=NullTV" Version="0.2.0.0" ProcessorArchitecture="arm64" />
+ <Identity Name="NullTV" Publisher="CN=NullTV" Version="0.3.0.0" ProcessorArchitecture="arm64" />
  <Properties><DisplayName>NullTV</DisplayName><PublisherDisplayName>NullTV contributors</PublisherDisplayName><Logo>Assets\StoreLogo.png</Logo></Properties>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" /></Dependencies>
  <Resources><Resource Language="en-us" /></Resources>

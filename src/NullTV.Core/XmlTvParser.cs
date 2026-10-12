@@ -17,9 +17,22 @@ public static class XmlTvParser
             using var sub = reader.ReadSubtree();
             var e = await XElement.LoadAsync(sub, LoadOptions.None, ct);
             if (!TryTime((string?)e.Attribute("start"), out var start) || !TryTime((string?)e.Attribute("stop"), out var end) || end <= start || end < from || start > until) continue;
-            result.Add(new((string?)e.Attribute("channel") ?? "", (string?)e.Element("title") ?? "Untitled", (string?)e.Element("desc") ?? "", start, end));
+            result.Add(new((string?)e.Attribute("channel") ?? "", (string?)e.Element("title") ?? "Untitled", (string?)e.Element("desc") ?? "", start, end) {
+                Subtitle=(string?)e.Element("sub-title")??"", Category=string.Join(" · ",e.Elements("category").Select(c=>c.Value).Distinct()),
+                Rating=string.Join(" ",new[]{(string?)e.Element("rating")?.Attribute("system"),(string?)e.Element("rating")?.Element("value")}.Where(v=>!string.IsNullOrWhiteSpace(v))),
+                Episode=EpisodeLabel(e), IsNew=e.Element("new")!=null, IsPremiere=e.Element("premiere")!=null, IsRepeat=e.Element("previously-shown")!=null
+            });
         }
         return result.OrderBy(p => p.Start).ToList();
+    }
+    private static string EpisodeLabel(XElement programme)
+    {
+        var episodes=programme.Elements("episode-num").ToArray();
+        var screen=episodes.FirstOrDefault(e=>(string?)e.Attribute("system") is null or "onscreen"); if(screen!=null) return screen.Value;
+        var indexed=episodes.FirstOrDefault(e=>(string?)e.Attribute("system")=="xmltv_ns"); if(indexed==null) return "";
+        var parts=indexed.Value.Split('.'); var labels=new List<string>();
+        for(int n=0;n<Math.Min(2,parts.Length);n++) if(int.TryParse(parts[n].Split('/')[0].Trim(),out var value) && value is >=0 and <100000) labels.Add((n==0 ? "S" : "E")+(value+1));
+        return string.Join(" · ",labels);
     }
     public static bool TryTime(string? value, out DateTimeOffset result)
     {
