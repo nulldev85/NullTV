@@ -191,7 +191,15 @@ public sealed partial class MainWindow : Window
     private async Task<ContentDialogResult> DialogAsync(string title,UIElement content,string primary="Save")
     {
         dialogDepth++; foreach(var s in surfaces) s.Hide(true);
-        try { var primaryStyle=new Style(typeof(Button)); primaryStyle.Setters.Add(new Setter(Control.BackgroundProperty,new SolidColorBrush(Color(settings.Appearance.Accent)))); primaryStyle.Setters.Add(new Setter(Control.ForegroundProperty,new SolidColorBrush(Color("#191613")))); primaryStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty,44d)); return await new ContentDialog { Title=title,Content=content,PrimaryButtonText=primary,PrimaryButtonStyle=primaryStyle,CloseButtonText="Cancel",DefaultButton=ContentDialogButton.Primary,XamlRoot=root.XamlRoot,RequestedTheme=root.RequestedTheme }.ShowAsync(); }
+        try
+        {
+            var primaryStyle=new Style(typeof(Button)); primaryStyle.Setters.Add(new Setter(Control.BackgroundProperty,new SolidColorBrush(Color(settings.Appearance.Accent)))); primaryStyle.Setters.Add(new Setter(Control.ForegroundProperty,new SolidColorBrush(Color("#191613")))); primaryStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty,44d));
+            var dialog=new ContentDialog { Title=title,Content=content,PrimaryButtonText=primary,PrimaryButtonStyle=primaryStyle,CloseButtonText="Cancel",DefaultButton=ContentDialogButton.Primary,XamlRoot=root.XamlRoot,RequestedTheme=root.RequestedTheme };
+            foreach(var key in new[] { "AccentButtonBackground","AccentButtonBackgroundPointerOver","AccentButtonBackgroundPressed" }) dialog.Resources[key]=new SolidColorBrush(Color(settings.Appearance.Accent));
+            foreach(var key in new[] { "AccentButtonForeground","AccentButtonForegroundPointerOver","AccentButtonForegroundPressed" }) dialog.Resources[key]=new SolidColorBrush(Color("#191613"));
+            dialog.Resources["ContentDialogCornerRadius"]=new CornerRadius(16);
+            return await dialog.ShowAsync();
+        }
         finally { dialogDepth--; if(currentTab=="Live TV" && dialogDepth==0) foreach(var s in surfaces) s.Hide(!active.ContainsKey(s)); }
     }
     private async Task<bool> UnlockAsync(MediaItem item)
