@@ -29,6 +29,9 @@
 - Redesigned all five views with a vertical navigation rail, consistent typography, quiet cards and intentional empty states.
 - Adopted an OLED palette of true black, warm charcoal, ivory and champagne; removed the original cyan accent.
 - Kept inactive native video surfaces hidden during navigation, resize and cancelled dialogs; stopping playback restores the empty state.
+- Applied the app accent to dialog hover/focus states and corrected Settings card sizing after visual checks.
+- Disabled mpv's retained EOF frame so live end events reach reconnect handling; a 42-second local HTTP test confirmed the 30-second clip loaded twice automatically.
+- Final validation: 24 core tests passed, five native ARM64 startup views passed, and H.264 1280×720 / 30 fps used D3D11VA with zero dropped frames. Captured native Live TV, Guide, Settings and Media Servers screenshots.
 - Replaced the browser bootstrap archive with an ordinary Git source tree and updated official Actions versions.
 - Added deterministic ARM64 publish script, dependency checksum lock, PE validation and GitHub Actions workflow.
 - Added optional MSIX packaging and documented unsigned-package installation limits.

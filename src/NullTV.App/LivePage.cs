@@ -88,7 +88,7 @@ public sealed partial class MainWindow
         v.Activity+=()=> { lastInput=DateTimeOffset.UtcNow; if(owner!=null) return; if(playerControls!=null) playerControls.Visibility=Visibility.Visible; surface=v; foreach(var tile in surfaces) tile.Player?.Set("mute",tile==v ? "no" : "yes"); if(active.TryGetValue(v,out var item)) { playing=item; if(playingTitle!=null) playingTitle.Text=item.Name; } else { playing=null; if(playingTitle!=null) playingTitle.Text="Choose a channel for this tile"; } };
         v.Swipe+=ChannelStep;
         v.PointerPressed+=(_,_)=> { if(owner==null) { surface=v; playing=active.GetValueOrDefault(v); } };
-        v.Loaded+=(_,_)=> { if(dialogDepth>0 || currentTab!="Live TV" || !active.ContainsKey(v)) v.Hide(true); if(v.Player==null) return; v.Player.Loaded+=()=>DispatcherQueue.TryEnqueue(()=> { status.Text="Playing"; }); v.Player.Ended+=error=>DispatcherQueue.TryEnqueue(()=> { if(error || active.GetValueOrDefault(v)?.Kind==MediaKind.Live) _=GuardAsync(()=>ReconnectAsync(v)); else _=GuardAsync(()=>MarkEndedAsync(v)); }); };
+        v.Loaded+=(_,_)=> { if(dialogDepth>0 || currentTab!="Live TV" || !active.ContainsKey(v)) v.Hide(true); if(v.Player==null) return; v.Player.Loaded+=()=>DispatcherQueue.TryEnqueue(()=> { validationPlaybackLoads++; status.Text="Playing"; }); v.Player.Ended+=error=>DispatcherQueue.TryEnqueue(()=> { if(error || active.GetValueOrDefault(v)?.Kind==MediaKind.Live) _=GuardAsync(()=>ReconnectAsync(v)); else _=GuardAsync(()=>MarkEndedAsync(v)); }); };
         return v;
     }
     private async Task PlayAsync(MediaItem item)

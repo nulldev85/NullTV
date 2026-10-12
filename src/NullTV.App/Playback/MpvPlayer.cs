@@ -32,7 +32,7 @@ public sealed class MpvPlayer : IDisposable
             Option("config","no"); Option("load-scripts","no"); Option("terminal","no"); Option("msg-level","all=no");
             Option("input-default-bindings","no"); Option("input-vo-keyboard","no"); Option("input-cursor","no"); Option("osc","no");
             Option("wid",hwnd.ToInt64().ToString()); Option("vo","gpu-next"); Option("gpu-api","d3d11"); Option("gpu-context","d3d11");
-            Option("hwdec",settings.HardwareDecode ? "d3d11va" : "no"); Option("idle","yes"); Option("keep-open","yes");
+            Option("hwdec",settings.HardwareDecode ? "d3d11va" : "no"); Option("idle","yes"); Option("keep-open","no");
             Option("cache","yes"); Option("demuxer-max-bytes",$"{settings.BufferMiB}MiB"); Option("demuxer-readahead-secs",settings.LowLatency ? "1" : settings.CacheSeconds.ToString());
             Option("cache-pause",settings.LowLatency ? "no" : "yes"); Option("network-timeout","15");
             Option("volume",settings.Volume.ToString()); Option("alang",settings.AudioLanguage); Option("slang",settings.SubtitleLanguage); Option("audio-device",settings.AudioDevice);

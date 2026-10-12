@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
     private DateTimeOffset unlockedUntil;
     private int dialogDepth;
     private bool validationFailed;
+    private int validationPlaybackLoads;
     public MainWindow()
     {
         Title="NullTV";
@@ -95,7 +96,7 @@ public sealed partial class MainWindow : Window
         var secondsIndex=Array.IndexOf(args,"--smoke-seconds");
         if(secondsIndex>=0 && secondsIndex+1<args.Length && int.TryParse(args[secondsIndex+1],out var seconds) && seconds is >=2 and <=60 && Array.IndexOf(args,"--data-dir")>=0)
         {
-            var end=new DispatcherTimer { Interval=TimeSpan.FromSeconds(seconds) }; end.Tick+=async (_,_)=> { end.Stop(); Directory.CreateDirectory(store.DirectoryPath); await File.WriteAllTextAsync(Path.Combine(store.DirectoryPath,"ui-validation.json"),System.Text.Json.JsonSerializer.Serialize(new { View=currentTab,Passed=!validationFailed,Width=root.ActualWidth,Height=root.ActualHeight,NativePlayer=surface?.Player!=null,Architecture=System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString() })); closingConfirmed=true; await store.SaveAsync(settings); Close(); }; end.Start();
+            var end=new DispatcherTimer { Interval=TimeSpan.FromSeconds(seconds) }; end.Tick+=async (_,_)=> { end.Stop(); Directory.CreateDirectory(store.DirectoryPath); await File.WriteAllTextAsync(Path.Combine(store.DirectoryPath,"ui-validation.json"),System.Text.Json.JsonSerializer.Serialize(new { View=currentTab,Passed=!validationFailed,Width=root.ActualWidth,Height=root.ActualHeight,NativePlayer=surface?.Player!=null,PlaybackLoads=validationPlaybackLoads,Architecture=System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString() })); closingConfirmed=true; await store.SaveAsync(settings); Close(); }; end.Start();
         }
     }
     private void ApplyAppearance()
