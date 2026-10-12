@@ -21,6 +21,7 @@ jobs:
         with:
           name: NullTV-win-arm64
           path: |
+            **/artifacts/NullTV-Setup-arm64.msi
             **/artifacts/NullTV-win-arm64.zip
             **/artifacts/NullTV-arm64.msix
           if-no-files-found: error

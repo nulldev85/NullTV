@@ -4,9 +4,11 @@ Native Windows 11 ARM64 IPTV and media-server client for Surface Pro 11. Bring y
 
 ## Run
 
-Extract **NullTV-win-arm64.zip** completely and run `NullTV-win-arm64/NullTV.exe`. The folder contains the ARM64 .NET runtime, Windows App SDK runtime and `libmpv-2.dll`; no separate runtime installation is required. Windows 11 ARM64 is required. Keep every file beside the executable. Open **Settings → Sources → Add IPTV source**, enter your account or choose your local M3U/M3U8 file, and save. Click a channel in Live TV.
+Run **NullTV-Setup-arm64.msi**, then launch **NullTV** from the Start menu. The per-user installer registers the app in Windows Settings → Apps and installs it under `%LOCALAPPDATA%\Programs\NullTV`. Close an older running build before installing. Your encrypted sources, profiles and history remain under `%LOCALAPPDATA%\NullTV`.
 
-The optional MSIX is **unsigned**. A publisher must sign it using a certificate trusted by the device and matching `CN=NullTV` before `Add-AppxPackage` installation. The portable ZIP is the ready-to-run deliverable; no certificate trust changes are necessary for it.
+The optional portable version is **NullTV-win-arm64.zip**: extract it completely and run `NullTV-win-arm64/NullTV.exe`. The folder contains the ARM64 .NET runtime, Windows App SDK runtime and `libmpv-2.dll`; no separate runtime installation is required. Windows 11 ARM64 is required. Keep every file beside the executable. Open **Settings → Sources → Add IPTV source**, enter your account or choose your local M3U/M3U8 file, and save. Click a channel in Live TV.
+
+The optional MSIX is **unsigned**. A publisher must sign it using a certificate trusted by the device and matching `CN=NullTV` before `Add-AppxPackage` installation. The MSI is the primary ready-to-install deliverable. It does not require an MSIX signing certificate. It is currently unsigned, so Windows may show an unknown-publisher prompt.
 
 ## Build on the Surface
 
@@ -16,13 +18,13 @@ Install the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) for A
 ./build.ps1 -Msix
 ```
 
-The script restores pinned NuGet dependencies, downloads the pinned ARM64 libmpv archive, verifies SHA-256 and PE machine type, runs tests, publishes `win-arm64` self-contained output and ZIP, then uses ARM64 MakeAppx from the Windows SDK NuGet package. No Visual Studio installation is needed. Windows `tar` extracts the `.7z` dependency. Downloads require NuGet and GitHub network access. Build tools may internally use an emulated x86/x64 XAML compiler; every app/runtime/playback executable delivered is checked for ARM64.
+The script restores pinned NuGet dependencies, downloads the pinned ARM64 libmpv archive, verifies SHA-256 and PE machine type, runs tests, publishes `win-arm64` self-contained output and ZIP, builds a per-user ARM64 MSI using pinned WiX 5.0.2 and UI extension 5.0.2, then optionally uses ARM64 MakeAppx from the Windows SDK NuGet package. No Visual Studio installation is needed. Windows `tar` extracts the `.7z` dependency. Downloads require NuGet and GitHub network access. Build tools may internally use an emulated x86/x64 XAML compiler; every app/runtime/playback executable delivered is checked for ARM64.
 
-Outputs: `artifacts/NullTV-win-arm64.zip`, `artifacts/NullTV-arm64.msix`. The app keeps encrypted data under `%LOCALAPPDATA%\NullTV`; rotating logs are in its `logs` subfolder. Copying portable binaries does not copy credentials. Use password-encrypted Backup / Restore to move settings between Windows users/devices.
+Outputs: `artifacts/NullTV-Setup-arm64.msi`, `artifacts/NullTV-win-arm64.zip`, `artifacts/NullTV-arm64.msix`. The app keeps encrypted data under `%LOCALAPPDATA%\NullTV`; rotating logs are in its `logs` subfolder. Copying portable binaries does not copy credentials. Use password-encrypted Backup / Restore to move settings between Windows users/devices.
 
 ## CI and repository
 
-[NullTV repository](https://github.com/nulldev85/NullTV) · [Actions](https://github.com/nulldev85/NullTV/actions). Select a successful **Native ARM64 build** run and download the **NullTV-win-arm64** artifact (GitHub wraps the portable ZIP and optional MSIX in an artifact ZIP). The workflow uses `windows-11-arm` and supports push, pull request and manual dispatch. The repository contains the ordinary source tree; run `build.ps1` from its root.
+[NullTV repository](https://github.com/nulldev85/NullTV) · [Actions](https://github.com/nulldev85/NullTV/actions). Select a successful **Native ARM64 build** run and download the **NullTV-win-arm64** artifact (GitHub wraps the MSI, portable ZIP and optional MSIX in an artifact ZIP). The workflow uses `windows-11-arm` and supports push, pull request and manual dispatch. The repository contains the ordinary source tree; run `build.ps1` from its root.
 
 ## Architecture and engine
 
@@ -36,15 +38,15 @@ Tradeoffs: upstream Windows builds are community builds, and this pin is a devel
 
 ## Security and behavior
 
-Entire settings and channel-cache files are encrypted with current-user DPAPI; passwords, tokens and credential-bearing playlist/EPG addresses are masked in source forms. Backup uses PBKDF2-SHA256 (210,000 iterations), random salt/nonce and AES-256-GCM; lost passwords cannot be recovered. Logs record fixed event codes, exception types and method names only; exception messages and source file paths are excluded. Diagnostics exclude source addresses, names, user IDs, tokens, channel titles and credentials. Artwork is limited to 4 MiB per image and 128 MiB / 500 disk entries, with four downloads in flight.
+Entire settings and channel-cache files are encrypted with current-user DPAPI; passwords, tokens and credential-bearing playlist/EPG addresses are masked in source forms. Backup uses PBKDF2-SHA256 (210,000 iterations), random salt/nonce and AES-256-GCM; lost passwords cannot be recovered. Logs record fixed event codes, exception types and method names only; exception messages and source file paths are excluded. Diagnostics exclude source addresses, names, user IDs, tokens, channel titles and credentials. Artwork is limited to 4 MiB per image, with four downloads in flight, shared requests, retry after transient errors and a memory cache that retains visible artwork. Periodic disk maintenance trims to 128 MiB / 500 entries.
 
-ListView/GridView virtualize channels and posters. Playlist parsing and source refresh run off the UI thread. Energy Saver pauses automatic refresh; explicit refresh remains available. Offline catalogs survive restart. Reconnect backs off 1, 2, 4, 8, 16, 30 seconds, then stops after six failures. Favorites and history are profile-specific. Catch-up requires an advertised archive window, matching provider EPG listing and a successful media response before playback; providers use differing timestamp conventions, so catch-up can still fail.
+ListView/GridView virtualize channels and posters. Playlist parsing and source refresh run off the UI thread. Energy Saver pauses automatic refresh; explicit refresh remains available. Offline catalogs and encrypted guide caches survive restart. Reconnect backs off 1, 2, 4, 8, 16, 30 seconds, then stops after six failures. Favorites and history are profile-specific. Catch-up requires an advertised archive window, matching provider EPG listing and a successful media response before playback; providers use differing timestamp conventions, so catch-up can still fail.
 
 ## Features and limitations
 
 See [FEATURES.md](FEATURES.md) for the exact implemented/partial/deferred matrix and [CHANGELOG.md](CHANGELOG.md) for validation at each milestone. Server credentials were not supplied during development: integration behavior must be checked against your provider and your server versions. JSON fixtures are synthetic provider-shaped responses, not recordings of a real user's account. Reminders are in-app and require NullTV to remain running. Media servers direct-play only; DRM, transcoding negotiation and Plex server discovery are not implemented. No external content is bundled.
 
-The default OLED appearance uses a true-black background, warm charcoal panels, soft ivory text and a restrained champagne accent. Screenshots in `docs/screenshots` show the native app with no provider configured. Change the theme or accent under Settings → Appearance.
+The default OLED appearance uses true black, neutral charcoal and silver/white. Search fields, dropdowns and forms share input styling; hover feedback preserves each button’s shape. Click the star beside a channel or in the player to add a favorite. Live playback uses a square Stop action; playing VOD uses Pause. The compact transport is centered. The heading buttons hide navigation or the channel pane; the player’s expand button fills the normal app window, and Escape restores the panes. Screenshots in `docs/screenshots` show the native app using local synthetic artwork and generated playback media. No test source or media is bundled. Change the theme or accent under Settings → Appearance.
 
 ## Bug report
 

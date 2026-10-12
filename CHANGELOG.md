@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 — 2026-10-12
+
+- Replaced the brown accent with a neutral OLED palette and shared native styles for buttons, text, password and search fields, dropdowns and dialogs.
+- Fixed published XAML resources: compiled App/DesignResources XBF and the app PRI index now ship in every package, with build-time checks for omissions.
+- Added visible channel and player favorite stars; live Stop and VOD Pause/Play now follow observed engine state.
+- Centered a compact transport strip and added independent navigation/channel-pane toggles plus video expansion within the normal window.
+- Removed the mpv event-wait lock from the UI command path, queued commands asynchronously, observed/cached playback properties and initialized players only when needed.
+- Indexed programme schedules, reused channel rows, debounced search and virtualized guide cells. Guide data now persists encrypted across restarts.
+- Reworked artwork loading around stable bound rows, shared downloads, visible-image retention and transient retry.
+- Added a per-user ARM64 MSI with Start menu shortcut, upgrade support and Windows uninstall registration.
+- Regression suite: 28/28 passing; 50,000 entries parsed in 350 ms, 390,000-programme index built in 116 ms and 50,000 now/next lookups in 22 ms on the development ARM64 machine.
+- Native validation uses an isolated 50,000-channel / 390,000-programme / 240-movie fixture. Generated media and credentials are excluded from deliverables.
+
 ## 0.1.0 — 2026-10-11
 
 ### Milestone 1 — Sources and Live TV

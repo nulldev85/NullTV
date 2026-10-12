@@ -37,17 +37,19 @@ public sealed class SettingsStore(string directory)
     {
         var path = Path.Combine(directory,"settings.dat");
         if (!File.Exists(path)) return new();
-        var value = JsonSerializer.Deserialize<Settings>(SecretStore.Unprotect(await File.ReadAllBytesAsync(path)), JsonOptions) ?? throw new InvalidDataException("Settings are empty.");
+        var bytes=await File.ReadAllBytesAsync(path); var value = await Task.Run(()=>JsonSerializer.Deserialize<Settings>(SecretStore.Unprotect(bytes), JsonOptions)) ?? throw new InvalidDataException("Settings are empty.");
         value.Validate(); return value;
     }
     public async Task SaveAsync(Settings settings)
     {
         await gate.WaitAsync();
-        try { settings.Validate(); Directory.CreateDirectory(directory); var path = Path.Combine(directory,"settings.dat"); await File.WriteAllBytesAsync(path+".tmp",SecretStore.Protect(JsonSerializer.SerializeToUtf8Bytes(settings,JsonOptions))); File.Move(path+".tmp",path,true); }
+        try { settings.Validate(); var snapshot=JsonSerializer.SerializeToUtf8Bytes(settings,JsonOptions); var bytes=await Task.Run(()=>SecretStore.Protect(snapshot)); Directory.CreateDirectory(directory); var path = Path.Combine(directory,"settings.dat"); await File.WriteAllBytesAsync(path+".tmp",bytes); File.Move(path+".tmp",path,true); }
         finally { gate.Release(); }
     }
-    public async Task SaveCacheAsync(string id, Catalog catalog) { Directory.CreateDirectory(Path.Combine(directory,"cache")); await File.WriteAllBytesAsync(Path.Combine(directory,"cache",id+".dat"),SecretStore.Protect(JsonSerializer.SerializeToUtf8Bytes(catalog))); }
-    public async Task<Catalog?> LoadCacheAsync(string id) { var file=Path.Combine(directory,"cache",id+".dat"); if (!File.Exists(file)) return null; try { return JsonSerializer.Deserialize<Catalog>(SecretStore.Unprotect(await File.ReadAllBytesAsync(file))); } catch (Exception e) when (e is JsonException or CryptographicException or IOException) { return null; } }
+    public async Task SaveCacheAsync(string id, Catalog catalog) { var bytes=await Task.Run(()=>SecretStore.Protect(JsonSerializer.SerializeToUtf8Bytes(catalog))); Directory.CreateDirectory(Path.Combine(directory,"cache")); await File.WriteAllBytesAsync(Path.Combine(directory,"cache",id+".dat"),bytes); }
+    public async Task<Catalog?> LoadCacheAsync(string id) { var file=Path.Combine(directory,"cache",id+".dat"); if (!File.Exists(file)) return null; try { var bytes=await File.ReadAllBytesAsync(file); return await Task.Run(()=>JsonSerializer.Deserialize<Catalog>(SecretStore.Unprotect(bytes))); } catch (Exception e) when (e is JsonException or CryptographicException or IOException) { return null; } }
+    public async Task SaveGuideAsync(string id,List<Programme> guide) { var bytes=await Task.Run(()=>SecretStore.Protect(JsonSerializer.SerializeToUtf8Bytes(guide))); Directory.CreateDirectory(Path.Combine(directory,"cache")); await File.WriteAllBytesAsync(Path.Combine(directory,"cache",id+".guide"),bytes); }
+    public async Task<List<Programme>?> LoadGuideAsync(string id) { var file=Path.Combine(directory,"cache",id+".guide"); if(!File.Exists(file)) return null; try { var bytes=await File.ReadAllBytesAsync(file); return await Task.Run(()=>JsonSerializer.Deserialize<List<Programme>>(SecretStore.Unprotect(bytes))); } catch(Exception e) when(e is JsonException or CryptographicException or IOException) { return null; } }
     public static byte[] Backup(Settings settings, string password)
     {
         if (password.Length < 10) throw new InvalidDataException("Use a backup password of at least 10 characters.");

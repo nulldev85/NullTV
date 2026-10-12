@@ -9,7 +9,7 @@ public sealed class MediaServerClient(HttpClient http)
     private static void Headers(HttpRequestMessage request,Source s)
     {
         if(s.Kind==SourceKind.Plex) { request.Headers.Add("X-Plex-Token",s.ApiKey); request.Headers.Add("X-Plex-Client-Identifier",s.Id); request.Headers.Add("X-Plex-Product","NullTV"); }
-        else { request.Headers.TryAddWithoutValidation("X-Emby-Token",s.ApiKey); request.Headers.TryAddWithoutValidation("Authorization",$"MediaBrowser Client=\"NullTV\", Device=\"Windows ARM64\", DeviceId=\"{s.Id}\", Version=\"0.1.0\""); }
+        else { request.Headers.TryAddWithoutValidation("X-Emby-Token",s.ApiKey); request.Headers.TryAddWithoutValidation("Authorization",$"MediaBrowser Client=\"NullTV\", Device=\"Windows ARM64\", DeviceId=\"{s.Id}\", Version=\"0.2.0\""); }
     }
     private async Task<JsonDocument> JsonAsync(Source s,string path,CancellationToken ct)
     {

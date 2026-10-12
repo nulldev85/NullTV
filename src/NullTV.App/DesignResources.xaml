@@ -1,0 +1,63 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<ResourceDictionary.MergedDictionaries><XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/></ResourceDictionary.MergedDictionaries>
+<ResourceDictionary.ThemeDictionaries>
+<ResourceDictionary x:Key="Default">
+<SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#151517"/><SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="#AEB3BC"/><SolidColorBrush x:Key="ComboBoxDropDownForeground" Color="#F1F2F4"/><SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#303035"/>
+<SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedUnfocused" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelectedPointerOver" Color="Transparent"/>
+
+<SolidColorBrush x:Key="NullTVFieldBackground" Color="#151517"/><SolidColorBrush x:Key="NullTVFieldBorder" Color="#303035"/><SolidColorBrush x:Key="NullTVFieldText" Color="#F1F2F4"/><SolidColorBrush x:Key="NullTVFieldHint" Color="#989CA5"/><SolidColorBrush x:Key="NullTVFieldFocus" Color="#B9BEC7"/>
+<SolidColorBrush x:Key="NullTVButtonBackground" Color="#202125"/><SolidColorBrush x:Key="NullTVButtonText" Color="#ECEEF2"/>
+<SolidColorBrush x:Key="TextControlForeground" Color="#F1F2F4"/><SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F1F2F4"/><SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F1F2F4"/><SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#989CA5"/><SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#989CA5"/>
+<SolidColorBrush x:Key="TextControlBackground" Color="#151517"/><SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#19191C"/><SolidColorBrush x:Key="TextControlBorderBrush" Color="#303035"/><SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#B9BEC7"/>
+<SolidColorBrush x:Key="ComboBoxBackground" Color="#151517"/><SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#19191C"/><SolidColorBrush x:Key="ComboBoxForeground" Color="#F1F2F4"/><SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#303035"/>
+</ResourceDictionary>
+<ResourceDictionary x:Key="Light">
+<SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FFFFFF"/><SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="#AEB3BC"/><SolidColorBrush x:Key="ComboBoxDropDownForeground" Color="#202228"/><SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#D3D5DA"/>
+<SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedUnfocused" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelectedPointerOver" Color="Transparent"/>
+
+<SolidColorBrush x:Key="NullTVFieldBackground" Color="#FFFFFF"/><SolidColorBrush x:Key="NullTVFieldBorder" Color="#D3D5DA"/><SolidColorBrush x:Key="NullTVFieldText" Color="#202228"/><SolidColorBrush x:Key="NullTVFieldHint" Color="#646974"/><SolidColorBrush x:Key="NullTVFieldFocus" Color="#596170"/>
+<SolidColorBrush x:Key="NullTVButtonBackground" Color="#E8EAEE"/><SolidColorBrush x:Key="NullTVButtonText" Color="#202228"/>
+</ResourceDictionary>
+</ResourceDictionary.ThemeDictionaries>
+<CornerRadius x:Key="ControlCornerRadius">10</CornerRadius>
+<ControlTemplate x:Key="NullTVButtonTemplate" TargetType="Button">
+<Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+<VisualStateManager.VisualStateGroups><VisualStateGroup x:Name="CommonStates">
+<VisualState x:Name="Normal"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="1"/></VisualState.Setters></VisualState>
+<VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.82"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.6"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.35"/></VisualState.Setters></VisualState>
+</VisualStateGroup></VisualStateManager.VisualStateGroups>
+<ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" ContentTransitions="{TemplateBinding ContentTransitions}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" Foreground="{TemplateBinding Foreground}"/>
+</Border>
+</ControlTemplate>
+<Style x:Key="NullTVButtonStyle" TargetType="Button">
+<Setter Property="Template" Value="{StaticResource NullTVButtonTemplate}"/><Setter Property="Background" Value="{ThemeResource NullTVButtonBackground}"/><Setter Property="Foreground" Value="{ThemeResource NullTVButtonText}"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="10"/><Setter Property="MinHeight" Value="44"/><Setter Property="Padding" Value="16,10"/><Setter Property="FontSize" Value="14"/>
+</Style>
+<Style TargetType="Button" BasedOn="{StaticResource NullTVButtonStyle}"/>
+<Style x:Key="NullTVTextBoxStyle" TargetType="TextBox">
+<Setter Property="CornerRadius" Value="10"/><Setter Property="MinHeight" Value="46"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FontSize" Value="14"/><Setter Property="Padding" Value="14,11"/><Setter Property="Background" Value="{ThemeResource NullTVFieldBackground}"/><Setter Property="BorderBrush" Value="{ThemeResource NullTVFieldBorder}"/><Setter Property="Foreground" Value="{ThemeResource NullTVFieldText}"/><Setter Property="PlaceholderForeground" Value="{ThemeResource NullTVFieldHint}"/><Setter Property="BorderThickness" Value="1"/>
+</Style>
+<Style TargetType="TextBox" BasedOn="{StaticResource NullTVTextBoxStyle}"/>
+<Style x:Key="NullTVPasswordBoxStyle" TargetType="PasswordBox"><Setter Property="CornerRadius" Value="10"/><Setter Property="MinHeight" Value="46"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FontSize" Value="14"/><Setter Property="Padding" Value="14,11"/><Setter Property="Background" Value="{ThemeResource NullTVFieldBackground}"/><Setter Property="BorderBrush" Value="{ThemeResource NullTVFieldBorder}"/><Setter Property="Foreground" Value="{ThemeResource NullTVFieldText}"/></Style>
+<Style TargetType="PasswordBox" BasedOn="{StaticResource NullTVPasswordBoxStyle}"/><Style x:Key="NullTVComboBoxStyle" TargetType="ComboBox"><Setter Property="CornerRadius" Value="10"/><Setter Property="MinHeight" Value="46"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FontSize" Value="14"/><Setter Property="Padding" Value="14,10"/><Setter Property="Background" Value="{ThemeResource NullTVFieldBackground}"/><Setter Property="BorderBrush" Value="{ThemeResource NullTVFieldBorder}"/><Setter Property="Foreground" Value="{ThemeResource NullTVFieldText}"/></Style>
+<Style TargetType="ComboBox" BasedOn="{StaticResource NullTVComboBoxStyle}"/><Style TargetType="AutoSuggestBox"><Setter Property="CornerRadius" Value="10"/><Setter Property="MinHeight" Value="46"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="14"/></Style>
+<Style x:Key="NullTVComboBoxItemStyle" TargetType="ComboBoxItem">
+<Setter Property="Foreground" Value="{ThemeResource NullTVFieldText}"/><Setter Property="Background" Value="Transparent"/><Setter Property="FontSize" Value="14"/><Setter Property="MinHeight" Value="44"/><Setter Property="Padding" Value="14,10"/><Setter Property="UseSystemFocusVisuals" Value="True"/>
+<Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Grid x:Name="ItemChrome" Background="Transparent" Margin="4,2" Padding="{TemplateBinding Padding}" CornerRadius="8">
+<VisualStateManager.VisualStateGroups><VisualStateGroup x:Name="CommonStates">
+<VisualState x:Name="Normal"><VisualState.Setters><Setter Target="ItemChrome.Opacity" Value="1"/><Setter Target="SelectionMark.Opacity" Value="0"/></VisualState.Setters></VisualState>
+<VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="ItemChrome.Opacity" Value="0.72"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="ItemChrome.Opacity" Value="0.5"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="ItemChrome.Opacity" Value="0.35"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Selected"><VisualState.Setters><Setter Target="SelectionMark.Opacity" Value="1"/><Setter Target="ItemChrome.Opacity" Value="1"/></VisualState.Setters></VisualState>
+<VisualState x:Name="SelectedUnfocused"><VisualState.Setters><Setter Target="SelectionMark.Opacity" Value="1"/><Setter Target="ItemChrome.Opacity" Value="1"/></VisualState.Setters></VisualState>
+<VisualState x:Name="SelectedDisabled"><VisualState.Setters><Setter Target="SelectionMark.Opacity" Value="1"/><Setter Target="ItemChrome.Opacity" Value="0.35"/></VisualState.Setters></VisualState>
+<VisualState x:Name="SelectedPointerOver"><VisualState.Setters><Setter Target="SelectionMark.Opacity" Value="1"/><Setter Target="ItemChrome.Opacity" Value="0.72"/></VisualState.Setters></VisualState>
+<VisualState x:Name="SelectedPressed"><VisualState.Setters><Setter Target="SelectionMark.Opacity" Value="1"/><Setter Target="ItemChrome.Opacity" Value="0.5"/></VisualState.Setters></VisualState>
+</VisualStateGroup></VisualStateManager.VisualStateGroups>
+<Border x:Name="SelectionMark" Width="2" Height="16" CornerRadius="1" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" Margin="-10,0,0,0" Opacity="0"/>
+<ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+</Grid></ControlTemplate></Setter.Value></Setter>
+</Style>
+</ResourceDictionary>

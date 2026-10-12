@@ -22,29 +22,34 @@ public sealed class VideoSurface : UserControl, IDisposable
     private Subclass? callback;
     private Point pointerStart;
     private bool hidden;
+    private bool disposed;
+    private Task? initialization;
+    private (int X,int Y,int W,int H) bounds;
     public MpvPlayer? Player { get; private set; }
     public event Action? Activity;
     public event Action<int>? Swipe;
+    public event Action? Initialized;
     public VideoSurface(Window window, PlaybackSettings settings)
     {
         this.window=window; this.settings=settings; Background=new SolidColorBrush(Microsoft.UI.Colors.Black); MinHeight=120;
-        Loaded+=(_,_)=>Initialize(); LayoutUpdated+=(_,_)=>Position(); Unloaded+=(_,_)=>Hide(true);
+        Loaded+=(_,_)=>Position(); LayoutUpdated+=(_,_)=>Position(); Unloaded+=(_,_)=>Hide(true);
     }
-    public void Initialize()
+    public Task InitializeAsync()=>initialization??=InitializeCoreAsync();
+    private async Task InitializeCoreAsync()
     {
-        if(child!=IntPtr.Zero) { Hide(false); return; }
+        if(disposed) return;
         var parent=WinRT.Interop.WindowNative.GetWindowHandle(window);
         child=CreateWindowEx(0,"STATIC","",0x40000000|0x10000000|0x04000000|0x02000000,0,0,1,1,parent,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
         if(child==IntPtr.Zero) throw new InvalidOperationException("Could not create the video surface.");
         callback=(h,m,w,l,id,d)=> { if(m is 0x200 or 0x201 or 0x245) Activity?.Invoke(); if(m==0x246) pointerStart=new((short)((long)l&65535),(short)(((long)l>>16)&65535)); if(m==0x247) { var y=(short)(((long)l>>16)&65535); if(Math.Abs(y-pointerStart.Y)>80) Swipe?.Invoke(y>pointerStart.Y ? -1 : 1); } if(m==0x202) SetFocus(parent); return DefSubclassProc(h,m,w,l); };
-        SetWindowSubclass(child,callback,1,0); Player=new(child,settings); hidden=false; Position();
+        SetWindowSubclass(child,callback,1,0); hidden=true; ShowWindow(child,0); var hwnd=child; var player=await Task.Run(()=>new MpvPlayer(hwnd,settings)); if(disposed) { player.Dispose(); return; } Player=player; Initialized?.Invoke(); Position();
     }
     private void Position()
     {
         if(child==IntPtr.Zero || XamlRoot==null || ActualWidth<1 || ActualHeight<1 || hidden) return;
         var root=window.Content as UIElement; if(root==null) return;
-        try { var p=TransformToVisual(root).TransformPoint(new Point(0,0)); var scale=XamlRoot.RasterizationScale; SetWindowPos(child,IntPtr.Zero,(int)(p.X*scale),(int)(p.Y*scale),(int)(ActualWidth*scale),(int)(ActualHeight*scale),0x0010); } catch(ArgumentException) { }
+        try { var p=TransformToVisual(root).TransformPoint(new Point(0,0)); var scale=XamlRoot.RasterizationScale; var next=((int)(p.X*scale),(int)(p.Y*scale),(int)(ActualWidth*scale),(int)(ActualHeight*scale)); if(next==bounds) return; bounds=next; SetWindowPos(child,IntPtr.Zero,next.Item1,next.Item2,next.Item3,next.Item4,0x0010); } catch(ArgumentException) { }
     }
-    public void Hide(bool value) { hidden=value; if(child!=IntPtr.Zero) ShowWindow(child,value ? 0 : 5); if(!value) Position(); }
-    public void Dispose() { Player?.Dispose(); Player=null; if(child!=IntPtr.Zero) { DestroyWindow(child); child=IntPtr.Zero; } GC.KeepAlive(callback); }
+    public void Hide(bool value) { if(disposed) return; var changed=hidden!=value; hidden=value; if(changed && child!=IntPtr.Zero) ShowWindow(child,value ? 0 : 5); if(!value) { if(changed) bounds=default; Position(); } }
+    public void Dispose() { disposed=true; Player?.Dispose(); Player=null; if(child!=IntPtr.Zero) { DestroyWindow(child); child=IntPtr.Zero; } GC.KeepAlive(callback); }
 }

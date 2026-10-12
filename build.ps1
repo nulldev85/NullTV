@@ -1,4 +1,4 @@
-param([switch]$SkipTests,[switch]$Msix,[string]$Configuration='Release')
+param([switch]$SkipTests,[switch]$Msix,[switch]$SkipInstaller,[string]$Configuration='Release')
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $root=$PSScriptRoot
@@ -31,4 +31,5 @@ foreach($name in @('README.md','LICENSE','THIRD-PARTY-NOTICES.md','CHANGELOG.md'
 $zip=Join-Path $root 'artifacts/NullTV-win-arm64.zip'
 Compress-Archive -Path $publish -DestinationPath $zip -Force
 Write-Host "Portable app: $zip"
+if(!$SkipInstaller) { & (Join-Path $root 'scripts/package-msi.ps1') -PublishDirectory $publish }
 if($Msix) { & (Join-Path $root 'scripts/package-msix.ps1') -PublishDirectory $publish }

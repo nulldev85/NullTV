@@ -109,7 +109,7 @@ public sealed class PlaybackSettings
 public sealed class AppearanceSettings
 {
     public string Theme { get; set; } = "OLED";
-    public string Accent { get; set; } = "#D6C3A5";
+    public string Accent { get; set; } = "#D3D6DC";
     public double FontScale { get; set; } = 1;
     public bool Compact { get; set; }
     public bool ReducedMotion { get; set; }

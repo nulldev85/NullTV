@@ -3,7 +3,7 @@
   <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows10.0.19041.0</TargetFramework><TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
   <RootNamespace>NullTV.App</RootNamespace><AssemblyName>NullTV</AssemblyName><UseWinUI>true</UseWinUI><WindowsPackageType>None</WindowsPackageType>
   <Platforms>ARM64</Platforms><PlatformTarget>ARM64</PlatformTarget><RuntimeIdentifier>win-arm64</RuntimeIdentifier>
-  <SelfContained>true</SelfContained><WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained><PublishSingleFile>false</PublishSingleFile><PublishTrimmed>false</PublishTrimmed><ApplicationManifest>app.manifest</ApplicationManifest>
+  <SelfContained>true</SelfContained><WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained><PublishSingleFile>false</PublishSingleFile><PublishTrimmed>false</PublishTrimmed><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>../../packaging/Assets/NullTV.ico</ApplicationIcon>
  </PropertyGroup>
  <ItemGroup>
   <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
@@ -11,4 +11,9 @@
   <ProjectReference Include="../NullTV.Core/NullTV.Core.csproj" />
   <Content Include="../../native/libmpv-2.dll" Link="libmpv-2.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
  </ItemGroup>
+ <Target Name="PublishAppXamlResources" AfterTargets="Publish">
+  <ItemGroup><AppXamlResources Include="$(TargetDir)**/*.xbf;$(TargetDir)$(AssemblyName).pri" /></ItemGroup>
+  <Copy SourceFiles="@(AppXamlResources)" DestinationFiles="@(AppXamlResources->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+  <Error Condition="!Exists('$(PublishDir)App.xbf') Or !Exists('$(PublishDir)DesignResources.xbf') Or !Exists('$(PublishDir)$(AssemblyName).pri')" Text="Published app XAML resources are incomplete." />
+ </Target>
 </Project>

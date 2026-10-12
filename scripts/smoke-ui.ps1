@@ -10,7 +10,7 @@ foreach($tab in @('Live TV','Guide','Movies & Series','Media Servers','Settings'
  $reportFile=Join-Path $dir 'ui-validation.json'
  if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $reportFile)) { throw "UI validation crashed: $tab (exit $($process.ExitCode))" }
  $report=Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
- if(!$report.Passed -or $report.Architecture -ne 'Arm64' -or $report.Width -lt 400) { throw "UI validation failed: $tab" }
+ if(!$report.Passed -or !$report.DesignResources -or $report.Architecture -ne 'Arm64' -or $report.Width -lt 400) { throw "UI validation failed: $tab" }
  $reports+=$report
  Write-Host "PASS native UI: $tab"
 }
