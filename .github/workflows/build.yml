@@ -1,0 +1,33 @@
+name: Native ARM64 build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Extract source archive when using browser bootstrap
+        shell: pwsh
+        run: |
+          if (Test-Path NullTV-source.zip) { Expand-Archive NullTV-source.zip -DestinationPath source -Force }
+      - name: Test and publish native ARM64
+        shell: pwsh
+        run: |
+          $sourceRoot = if (Test-Path source/NullTV/build.ps1) { 'source/NullTV' } else { '.' }
+          & "$sourceRoot/build.ps1" -Msix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NullTV-win-arm64
+          path: |
+            **/artifacts/NullTV-win-arm64.zip
+            **/artifacts/NullTV-arm64.msix
+          if-no-files-found: error
+          retention-days: 30
