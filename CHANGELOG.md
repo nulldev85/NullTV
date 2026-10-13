@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-10-12
+
+- Expanded and fullscreen players keep a compact Back and Close stream bar outside the video. Back restores the normal app view; Escape exits the current mode, including from focused player controls or text fields. Nested fullscreen returns to the preceding expanded view.
+- Close stream remains visible in small Guide previews and available during loading, buffering and reconnect attempts. Now Playing also has a close action in its heading.
+- Closing playback cancels pending loading/reconnection, stops all active tiles and picture-in-picture, saves progress and restores the Guide or normal player layout. Expanded viewing preserves navigation preferences; hover buttons indicate Restore app view and Exit fullscreen. Inactive transport cannot reopen a closed stream during focus/layout transitions; replay uses the explicit Play again action.
+
 ## 0.5.0 — 2026-10-12
 
 - Added a dedicated Now Playing tab for live, movies, episodes and media-server playback. Guide retains its native preview; Live TV and Movies & Series are browsing views. Navigation shares the existing video session; Back to guide/library returns to browsing.

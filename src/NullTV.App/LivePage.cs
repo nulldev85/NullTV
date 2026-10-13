@@ -16,6 +16,7 @@ public sealed partial class MainWindow
     private readonly Dictionary<VideoSurface,MediaItem> active=[];
     private readonly Dictionary<VideoSurface,int> retries=[];
     private readonly Dictionary<VideoSurface,int> generations=[];
+    private readonly Dictionary<VideoSurface,CancellationTokenSource> streamRequests=[];
     private MediaItem? playing;
     private CancellationTokenSource? playbackRequest;
     private ListView? channelList,categoryList;
@@ -32,7 +33,8 @@ public sealed partial class MainWindow
     private UIElement? categoryRail,channelsCard,controlsCard;
     private Grid? playerControls;
     private PlayerOverlay? playerOverlay;
-    private Button? rewindButton,forwardButton,subtitlesButton,expandButton;
+    private Button? rewindButton,forwardButton,subtitlesButton,expandButton,fullscreenButton;
+    private UIElement? playerHeading;
     private Grid? liveBar;
     private TextBlock? livePositionLabel,streamInfo;
     private bool behindLive;
@@ -57,6 +59,7 @@ public sealed partial class MainWindow
         liveHeading=Heading("Live TV","Find something worth watching.",actions); Grid.SetColumnSpan(liveHeading,3); Place(livePage,liveHeading);
         var movieActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
         movieActions.Children.Add(IconButton("\uE700","Toggle app navigation",ToggleNavigation));
+        closeNowPlaying=Button("Close stream",StopPlayback); movieActions.Children.Add(closeNowPlaying);
         backToBrowse=Button("Back to browse",()=> { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); Navigate(playbackOrigin); }); movieActions.Children.Add(backToBrowse);
         libraryPlaybackHeading=Heading("Now playing","Your current stream. One player.",movieActions); libraryPlaybackHeading.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(libraryPlaybackHeading,3); Place(livePage,libraryPlaybackHeading);
         categoryList=new ListView { SelectionMode=ListViewSelectionMode.Single }; QuietItems(categoryList);
@@ -73,7 +76,7 @@ public sealed partial class MainWindow
         channelList.RightTapped+=(_,e)=> { if(e.OriginalSource is FrameworkElement { DataContext:ChannelRow row }) { var menu=new MenuFlyout(); var item=new MenuFlyoutItem { Text=row.IsFavorite ? "Remove from favorites" : "Add to favorites",Icon=new FontIcon { Glyph=row.FavoriteGlyph } }; item.Click+=(_,_)=>_=GuardAsync(()=>ToggleFavoriteAsync(row.Item)); menu.Items.Add(item); menu.ShowAt(channelList,e.GetPosition(channelList)); e.Handled=true; } };
         Place(channels,channelList,3); channelsCard=Card(channels,new Thickness(14)); Place(livePage,channelsCard,1,1);
         var stage=new Grid { RowSpacing=14 }; playerStage=stage; stage.RowDefinitions.Add(new() { Height=GridLength.Auto }); stage.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
-        playingTitle=Text("PLAYER",10); playingTitle.CharacterSpacing=100; playingTitle.Opacity=.5; playingInfo=Text("",12); playingInfo.Opacity=.5; var playerHeading=Stack(playingTitle,playingInfo); playerHeading.Spacing=5; Place(stage,playerHeading);
+        playingTitle=Text("PLAYER",10); playingTitle.CharacterSpacing=100; playingTitle.Opacity=.5; playingInfo=Text("",12); playingInfo.Opacity=.5; var heading=Stack(playingTitle,playingInfo); heading.Spacing=5; playerHeading=heading; Place(stage,heading);
         videoGrid=new Grid { Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(SurfaceHex)),ColumnSpacing=8,RowSpacing=8 };
         surface=CreateSurface(); videoGrid.Children.Add(surface); emptyLive=new Grid(); videoGrid.Children.Add(emptyLive); videoHome=Card(videoGrid,new Thickness(0)); Place(stage,videoHome,1);
         seek=new PlaybackSlider { Minimum=0,Maximum=1,MinHeight=20,Height=20,IsEnabled=false };
@@ -94,13 +97,13 @@ public sealed partial class MainWindow
         primaryTransport=IconButton("\uE768","Play",ActivateTransport); primaryTransport.Width=48; primaryTransport.Height=48; primaryTransport.CornerRadius=new CornerRadius(24); primaryTransport.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(settings.Appearance.Accent)); primaryTransport.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#21222C")); transport.Children.Add(primaryTransport);
         forwardButton=Button("+10",()=>SeekRelative(10)); forwardButton.Padding=new Thickness(8); ToolTipService.SetToolTip(forwardButton,"Forward 10 seconds"); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(forwardButton,"Forward 10 seconds"); transport.Children.Add(forwardButton);
         nextButton=IconButton("\uE893","Next channel",()=>ChannelStep(1)); transport.Children.Add(nextButton);
-        stopButton=IconButton("\uE71A","Stop",StopPlayback); transport.Children.Add(stopButton);
+        stopButton=IconButton("\uE71A","Close stream",StopPlayback); transport.Children.Add(stopButton);
         muteButton=IconButton("\uE767","Mute",()=>surface?.Player?.Command("cycle","mute")); tools.Children.Add(muteButton);
         volumeControl=new PlaybackSlider { Minimum=0,Maximum=100,Value=settings.Playback.Volume,MinHeight=44,Width=84 }; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(volumeControl,"Volume"); volumeControl.ValueChanged+=(_,e)=> { if(updatingTransport) return; foreach(var v in surfaces) v.Player?.Set("volume",e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)); }; tools.Children.Add(volumeControl);
         subtitlesButton=Button("CC",()=>_=GuardAsync(SubtitlesMenuAsync)); subtitlesButton.Padding=new Thickness(8); subtitlesButton.Width=44; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(subtitlesButton,"Subtitles and closed captions"); ToolTipService.SetToolTip(subtitlesButton,"Subtitles and closed captions"); tools.Children.Add(subtitlesButton);
         favoriteButton=IconButton("\uE734","Add to favorites",()=> { var item=playing??lastPlayed; if(item!=null) _=GuardAsync(()=>ToggleFavoriteAsync(item)); }); tools.Children.Add(favoriteButton);
         expandButton=IconButton("\uE8A7","Expand video in window",ToggleExpandedVideo); tools.Children.Add(expandButton);
-        tools.Children.Add(IconButton("\uE740","Fullscreen",ToggleFullscreen)); var more=IconButton("\uE712","Playback options",()=>_=GuardAsync(PlaybackMenuAsync)); tools.Children.Add(more);
+        fullscreenButton=IconButton("\uE740","Fullscreen",ToggleFullscreen); tools.Children.Add(fullscreenButton); var more=IconButton("\uE712","Playback options",()=>_=GuardAsync(PlaybackMenuAsync)); tools.Children.Add(more);
         Place(playerControls,transport); Place(playerControls,tools,0,1);
         var timeline=new Grid(); timeline.Children.Add(progressArea); timeline.Children.Add(liveBar);
         var overlayContent=Stack(timeline,playerControls); overlayContent.Spacing=8;
@@ -118,6 +121,7 @@ public sealed partial class MainWindow
             foreach(var key in new[]{"SliderTrackValueFill","SliderTrackValueFillPointerOver","SliderTrackValueFillPressed","SliderThumbBackground","SliderThumbBackgroundPointerOver","SliderThumbBackgroundPressed","AccentFillColorDefaultBrush","AccentFillColorSecondaryBrush","AccentFillColorTertiaryBrush"}) slider.Resources[key]=green;
         }
         transportCard.KeyDown+=OnKey;
+        transportCard.AddHandler(UIElement.KeyDownEvent,new KeyEventHandler(OnEscape),true);
         playerOverlay=new(this,transportCard,infoCard,()=> (surface,IsPlayerVisible && playing!=null && dialogDepth==0 && surface!=null && active.ContainsKey(surface)),()=>surface?.Focus(FocusState.Programmatic));
         playerOverlay.LayoutChanged+=(width,compact)=> {
             compactVideoControls=compact;
@@ -138,9 +142,9 @@ public sealed partial class MainWindow
             streamInfo.FontSize=compact ? 9.5 : 10.5; streamInfo.MaxLines=compact ? 2 : 0; streamInfo.LineHeight=compact ? 12 : 15; streamInfo.MaxWidth=compact ? 150 : 230;
             infoCard.Padding=new Thickness(compact ? 5 : 7);
             if(volumeControl!=null) { volumeControl.MinHeight=volumeControl.Height=24; volumeControl.Width=64; volumeControl.Visibility=width>=760 ? Visibility.Visible : Visibility.Collapsed; }
-            if(expandButton!=null) expandButton.Visibility=width>=580 ? Visibility.Visible : Visibility.Collapsed;
+            if(expandButton!=null) expandButton.Visibility=Visibility.Visible;
             if(favoriteButton!=null) favoriteButton.Visibility=width>=520 ? Visibility.Visible : Visibility.Collapsed;
-            if(stopButton!=null) stopButton.Visibility=width>=480 ? Visibility.Visible : Visibility.Collapsed;
+            if(stopButton!=null) stopButton.Visibility=Visibility.Visible;
             more.Visibility=compact ? Visibility.Collapsed : Visibility.Visible; UpdatePlaybackControls();
         };
         playerOverlay.VisibilityChanged+=visible=>surface?.Player?.Set("sub-pos",(visible ? Math.Min(75,settings.Playback.SubtitlePosition) : settings.Playback.SubtitlePosition).ToString());
@@ -149,7 +153,8 @@ public sealed partial class MainWindow
     }
     private void UpdateLiveLayout()
     {
-        if(livePage==null || fullscreen) return; var available=pageHost.ActualWidth>0 ? pageHost.ActualWidth : 1000; var browse=currentTab=="Live TV"; var categories=browse && !channelsHidden && available>=900;
+        UpdatePlayerChrome();
+        if(livePage==null) return; var available=pageHost.ActualWidth>0 ? pageHost.ActualWidth : 1000; var browse=currentTab=="Live TV"; var categories=browse && !channelsHidden && available>=900;
         livePage.ColumnSpacing=categories ? 16 : 0;
         livePage.ColumnDefinitions[0].Width=new(categories ? 140 : 0); livePage.ColumnDefinitions[1].Width=browse ? new(1,GridUnitType.Star) : new(0); livePage.ColumnDefinitions[2].Width=browse ? new(0) : new(1,GridUnitType.Star);
         if(categoryRail!=null) categoryRail.Visibility=categories ? Visibility.Visible : Visibility.Collapsed;
@@ -157,7 +162,8 @@ public sealed partial class MainWindow
         if(playerStage!=null) { playerStage.Visibility=browse ? Visibility.Collapsed : Visibility.Visible; Grid.SetColumn(playerStage,0); Grid.SetColumnSpan(playerStage,3); }
         if(categoryPicker!=null) categoryPicker.Visibility=browse && !categories ? Visibility.Visible : Visibility.Collapsed;
         if(liveHeading!=null) liveHeading.Visibility=browse ? Visibility.Visible : Visibility.Collapsed;
-        if(libraryPlaybackHeading!=null) libraryPlaybackHeading.Visibility=currentTab=="Now Playing" && !expandedVideo ? Visibility.Visible : Visibility.Collapsed;
+        if(libraryPlaybackHeading!=null) libraryPlaybackHeading.Visibility=currentTab=="Now Playing" && !expandedVideo && !fullscreen ? Visibility.Visible : Visibility.Collapsed;
+        if(playerHeading!=null) playerHeading.Visibility=expandedVideo || fullscreen ? Visibility.Collapsed : Visibility.Visible;
         if(backToBrowse!=null) backToBrowse.Content=playbackOrigin=="Guide" ? "Back to guide" : playbackOrigin=="Movies & Series" ? "Back to library" : "Browse channels";
         if(playerControls!=null) playerControls.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(controlsCard!=null) controlsCard.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
@@ -173,6 +179,7 @@ public sealed partial class MainWindow
         if(owner==null) v.Loaded+=(_,_)=>DispatcherQueue.TryEnqueue(()=> { v.Hide(!IsPlayerVisible || dialogDepth>0 || !v.IsLoaded || !active.ContainsKey(v)); playerOverlay?.Update(); });
         v.Activity+=()=> { lastInput=DateTimeOffset.UtcNow; if(owner!=null) return; if(surface==v) return; surface=v; foreach(var tile in surfaces) tile.Player?.Set("mute",tile==v ? "no" : "yes"); if(active.TryGetValue(v,out var item)) { playing=item; if(playingTitle!=null) playingTitle.Text=item.Name; } else { playing=null; if(playingTitle!=null) playingTitle.Text="Choose a channel for this tile"; } UpdatePlaybackControls(); };
         v.Swipe+=ChannelStep;
+        if(owner==null) v.ExitRequested+=ExitCurrentPlayerMode;
         v.Pressed+=()=> { if(owner==null) { v.Focus(FocusState.Programmatic); playerOverlay?.Reveal(); } };
         v.PointerPressed+=(_,_)=> { if(owner==null) { surface=v; playing=active.GetValueOrDefault(v); } };
         v.Initialized+=()=> { if(dialogDepth>0 || !IsPlayerVisible || !active.ContainsKey(v)) v.Hide(true); if(v.Player==null) return; v.Player.StateChanged+=()=>DispatcherQueue.TryEnqueue(UpdatePlaybackControls); v.Player.Loaded+=()=>DispatcherQueue.TryEnqueue(()=> { if(!active.ContainsKey(v)) return; validationPlaybackLoads++; status.Text="Playing"; if(ReferenceEquals(surface,v)) infoUpdated=default; UpdatePlaybackControls(); }); v.Player.Ended+=error=>DispatcherQueue.TryEnqueue(()=> { if(error || active.GetValueOrDefault(v)?.Kind==MediaKind.Live) _=GuardAsync(()=>ReconnectAsync(v)); else _=GuardAsync(()=>MarkEndedAsync(v)); }); };
@@ -180,6 +187,7 @@ public sealed partial class MainWindow
     }
     private async Task PlayAsync(MediaItem item)
     {
+        ValidationStep("PLAY_REQUEST");
         playbackRequest?.Cancel(); using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); playbackRequest=request;
         try { await PlayRequestAsync(item,request); }
         finally { if(ReferenceEquals(playbackRequest,request)) playbackRequest=null; }
@@ -197,7 +205,10 @@ public sealed partial class MainWindow
         if(request.IsCancellationRequested) return;
         await surface.InitializeAsync(); if(request.IsCancellationRequested) return; playing=item; lastPlayed=item; behindLive=false; infoUpdated=default; if(streamInfo!=null) streamInfo.Text="Waiting for stream information…"; if(item.Kind!=MediaKind.Live) channelsHidden=true; active[surface]=item; retries[surface]=0; generations[surface]=generations.GetValueOrDefault(surface)+1;
         var start=settings.Profile.History.GetValueOrDefault(item.Id)?.Position??0; if(item.Kind==MediaKind.Live || settings.Profile.History.GetValueOrDefault(item.Id)?.Watched==true) start=0;
-        try { await surface.Player!.PlayAsync(item,start,request.Token); } catch(OperationCanceledException) when(request.IsCancellationRequested) { return; } if(request.IsCancellationRequested) return;
+        CancelStreamRequest(surface);
+        var session=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); streamRequests[surface]=session;
+        using var load=CancellationTokenSource.CreateLinkedTokenSource(request.Token,session.Token);
+        try { await surface.Player!.PlayAsync(item,start,load.Token); } catch(OperationCanceledException) when(load.IsCancellationRequested) { return; } if(load.IsCancellationRequested) return;
         foreach(var tile in surfaces) tile.Player?.Set("mute",tile==surface ? "no" : "yes"); surface.Hide(false); if(emptyLive!=null) emptyLive.Visibility=Visibility.Collapsed;
         if(playingTitle!=null) { playingTitle.Text=item.Name; playingTitle.FontSize=18; playingTitle.Opacity=1; playingTitle.CharacterSpacing=0; } if(playingInfo!=null) playingInfo.Text=$"{item.Category}  ·  {(item.ArchiveDays>0 ? $"{item.ArchiveDays} day archive" : item.Kind==MediaKind.Live ? "LIVE" : "Direct play")}"; UpdateLiveLayout();
         settings.Profile.History[item.Id]=new(start,0,false,DateTimeOffset.UtcNow); await store.SaveAsync(settings);
@@ -213,8 +224,18 @@ public sealed partial class MainWindow
         var generation=generations.GetValueOrDefault(v); var attempt=retries.GetValueOrDefault(v)+1; retries[v]=attempt;
         if(attempt>6) { status.Text="The stream failed after six reconnect attempts. Select it again to retry."; return; }
         var delay=Math.Min(30,1<<Math.Min(attempt-1,5)); status.Text=$"Stream interrupted. Reconnecting in {delay}s (attempt {attempt}/6)…";
-        await Task.Delay(TimeSpan.FromSeconds(delay),lifetime.Token);
-        if(generations.GetValueOrDefault(v)==generation && active.GetValueOrDefault(v)?.Id==item.Id) if(v.Player!=null) await v.Player.PlayAsync(item);
+        if(!streamRequests.TryGetValue(v,out var session)) return;
+        var token=session.Token;
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(delay),token);
+            if(generations.GetValueOrDefault(v)==generation && active.GetValueOrDefault(v)?.Id==item.Id) if(v.Player!=null) await v.Player.PlayAsync(item,ct:token);
+        }
+        catch(OperationCanceledException) when(token.IsCancellationRequested) { }
+    }
+    private void CancelStreamRequest(VideoSurface video)
+    {
+        if(streamRequests.Remove(video,out var request)) { request.Cancel(); request.Dispose(); }
     }
     private async Task MarkEndedAsync(VideoSurface v) { if(active.TryGetValue(v,out var item) && item.Kind!=MediaKind.Live) { var state=settings.Profile.History.GetValueOrDefault(item.Id); if(state!=null) settings.Profile.History[item.Id]=state with { Watched=true }; await store.SaveAsync(settings); } }
     private async Task SaveProgressAsync()
@@ -223,7 +244,17 @@ public sealed partial class MainWindow
         UpdatePlaybackControls();
         await store.SaveAsync(settings);
     }
-    private void StopPlayback() { playerOverlay?.Hide(); playbackRequest?.Cancel(); _=GuardAsync(SyncStoppedAsync); foreach(var v in surfaces) { generations[v]=generations.GetValueOrDefault(v)+1; v.Player?.Command("stop"); v.Hide(true); } pipWindow?.Close(); active.Clear(); playing=null; if(emptyLive!=null) emptyLive.Visibility=Visibility.Visible; if(playingTitle!=null) { playingTitle.Text="PLAYER"; playingTitle.FontSize=10; playingTitle.Opacity=.5; playingTitle.CharacterSpacing=100; } if(playingInfo!=null) playingInfo.Text=""; UpdateLiveLayout(); status.Text="Playback stopped."; }
+    private void StopPlayback()
+    {
+        playerOverlay?.Hide(); playbackRequest?.Cancel();
+        _=GuardAsync(SaveProgressAsync); _=GuardAsync(SyncStoppedAsync);
+        foreach(var v in surfaces) { CancelStreamRequest(v); generations[v]=generations.GetValueOrDefault(v)+1; v.Player?.Command("stop"); v.Hide(true); }
+        pipWindow?.Close(); active.Clear(); playing=null; behindLive=false;
+        if(emptyLive!=null) emptyLive.Visibility=Visibility.Visible;
+        if(playingTitle!=null) { playingTitle.Text="PLAYER"; playingTitle.FontSize=10; playingTitle.Opacity=.5; playingTitle.CharacterSpacing=100; }
+        if(playingInfo!=null) playingInfo.Text="";
+        ExitPlayerView(); status.Text="Playback stopped.";
+    }
     private void ChannelStep(int step) { var list=currentTab=="Guide" || playbackOrigin=="Guide" ? FavoriteGuide.Channels(items,settings.Profile).ToList() : (channelList?.ItemsSource as IEnumerable<ChannelRow>)?.Select(r=>r.Item).ToList()??[]; if(list.Count==0) return; var index=list.FindIndex(i=>i.Id==playing?.Id); _=GuardAsync(()=>PlayAsync(list[(index+step+list.Count)%list.Count])); }
     private void UpdateLive()
     {
@@ -268,9 +299,7 @@ public sealed partial class MainWindow
     private void ToggleFullscreen()
     {
         fullscreen=!fullscreen; AppWindow.SetPresenter(fullscreen ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Default);
-        if(sidebar!=null) sidebar.Visibility=fullscreen || navigationHidden ? Visibility.Collapsed : Visibility.Visible; root.ColumnDefinitions[0].Width=new(fullscreen || navigationHidden ? 0 : 184); status.Visibility=fullscreen ? Visibility.Collapsed : Visibility.Visible; if(livePage!=null && fullscreen) { livePage.ColumnDefinitions[0].Width=new(0); livePage.ColumnDefinitions[1].Width=new(0); if(categoryRail!=null) categoryRail.Visibility=Visibility.Collapsed; if(channelsCard!=null) channelsCard.Visibility=Visibility.Collapsed; if(playerStage!=null) { Grid.SetColumn(playerStage,0); Grid.SetColumnSpan(playerStage,3); } }
-        root.RowDefinitions[0].Height=new(fullscreen ? 0 : 58); if(!fullscreen) UpdateLiveLayout(); lastInput=DateTimeOffset.UtcNow;
-        if(currentTab=="Guide") UpdateGuideVideoLayout();
+        lastInput=DateTimeOffset.UtcNow; RefreshPlayerView();
     }
     private async Task PlaybackMenuAsync()
     {
@@ -287,7 +316,7 @@ public sealed partial class MainWindow
     {
         if(videoGrid==null) return; multi=!multi;
         if(multi) { videoGrid.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); videoGrid.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); videoGrid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); videoGrid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); for(int i=1;i<4;i++) { var s=CreateSurface(); Place(videoGrid,s,i/2,i%2); } status.Text="Tap a video tile, then select a channel for that tile."; }
-        else { foreach(var v in surfaces.Skip(1).ToArray()) { active.Remove(v); generations[v]=generations.GetValueOrDefault(v)+1; v.Dispose(); videoGrid.Children.Remove(v); surfaces.Remove(v); } surface=surfaces[0]; playing=active.GetValueOrDefault(surface); videoGrid.RowDefinitions.Clear(); videoGrid.ColumnDefinitions.Clear(); }
+        else { foreach(var v in surfaces.Skip(1).ToArray()) { CancelStreamRequest(v); active.Remove(v); generations[v]=generations.GetValueOrDefault(v)+1; v.Dispose(); videoGrid.Children.Remove(v); surfaces.Remove(v); } surface=surfaces[0]; playing=active.GetValueOrDefault(surface); videoGrid.RowDefinitions.Clear(); videoGrid.ColumnDefinitions.Clear(); }
     }
     private void OpenPip()
     {
@@ -296,8 +325,6 @@ public sealed partial class MainWindow
     private void OnKey(object sender,KeyRoutedEventArgs e)
     {
         if(Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement((sender as FrameworkElement)?.XamlRoot??root.XamlRoot) is TextBox or PasswordBox or AutoSuggestBox) return;
-        if(e.Key==VirtualKey.Escape && expandedVideo && !fullscreen) { ToggleExpandedVideo(); e.Handled=true; return; }
-        if(e.Key==VirtualKey.Escape && fullscreen) { ToggleFullscreen(); e.Handled=true; return; }
         if(!IsPlayerVisible) return;
         if(e.Key is >=VirtualKey.Number0 and <=VirtualKey.Number9) { if(DateTimeOffset.UtcNow-lastInput>TimeSpan.FromSeconds(2)) numeric=""; numeric+=((int)e.Key-(int)VirtualKey.Number0).ToString(); lastInput=DateTimeOffset.UtcNow; status.Text=$"Channel {numeric} · press Enter"; e.Handled=true; return; }
         if(e.Key==VirtualKey.Enter && int.TryParse(numeric,out var n)) { numeric=""; var channel=items.FirstOrDefault(i=>i.Kind==MediaKind.Live && i.Number==n); if(channel!=null) _=GuardAsync(()=>PlayAsync(channel)); e.Handled=true; return; }

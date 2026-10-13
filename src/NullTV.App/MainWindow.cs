@@ -51,7 +51,7 @@ public sealed partial class MainWindow : Window
         var data=dataIndex>=0 && dataIndex+1<args.Length ? args[dataIndex+1] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NullTV");
         store=new(data); log=new(Path.Combine(data,"logs"));
         ExtendsContentIntoTitleBar=true;
-        root.RowDefinitions.Add(new() { Height=new(58) }); root.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto });
+        root.RowDefinitions.Add(new() { Height=new(58) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto }); root.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto });
         root.ColumnDefinitions.Add(new() { Width=new(184) }); root.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var titlebar=new Grid { Padding=new Thickness(24,0,150,0) }; titlebar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); titlebar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var brand=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,VerticalAlignment=VerticalAlignment.Center };
@@ -65,10 +65,12 @@ public sealed partial class MainWindow : Window
         for(int i=0;i<names.Length;i++) { var name=names[i]; var b=Button(name,()=>Navigate(name)); b.Tag=name; b.Content=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,Children={ new FontIcon { Glyph=glyphs[i],FontSize=17 },new TextBlock { Text=name=="Movies & Series" ? "Movies & series" : name,FontSize=13,VerticalAlignment=VerticalAlignment.Center } } }; b.HorizontalAlignment=HorizontalAlignment.Stretch; b.HorizontalContentAlignment=HorizontalAlignment.Left; b.Padding=new Thickness(14,12,10,12); b.MinHeight=48; navigation.Children.Add(b); }
         var rail=new Grid(); rail.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); rail.RowDefinitions.Add(new() { Height=GridLength.Auto }); Place(rail,navigation);
         var railFooter=Stack(Text("YOUR SCREEN.\nYOUR SOURCES.",10)); railFooter.Opacity=.35; railFooter.Margin=new Thickness(26,16,16,24); Place(rail,railFooter,1);
-        sidebar=new Border { BorderThickness=new Thickness(0,0,1,0),BorderBrush=new SolidColorBrush(Color("#44475A")),Child=rail }; Place(root,sidebar,1);
-        pageHost.Margin=new Thickness(28,18,28,20); Place(root,pageHost,1,1);
-        status.Margin=new Thickness(28,0,28,14); status.FontSize=11; status.Opacity=.45; Place(root,status,2,1);
+        sidebar=new Border { BorderThickness=new Thickness(0,0,1,0),BorderBrush=new SolidColorBrush(Color("#44475A")),Child=rail }; Place(root,sidebar,2);
+        BuildPlayerModeBar();
+        pageHost.Margin=new Thickness(28,18,28,20); Place(root,pageHost,2,1);
+        status.Margin=new Thickness(28,0,28,14); status.FontSize=11; status.Opacity=.45; Place(root,status,3,1);
         root.KeyDown+=OnKey;
+        root.AddHandler(UIElement.KeyDownEvent,new KeyEventHandler(OnEscape),true);
         root.PointerMoved+=(_,_)=>lastInput=DateTimeOffset.UtcNow;
         root.SizeChanged+=(_,_)=>UpdateLiveLayout();
         Content=root;
@@ -127,7 +129,7 @@ public sealed partial class MainWindow : Window
         profileLabel.Text=$"◉   {settings.Profile.Name}";
     }
     private static Windows.UI.Color Color(string hex) { try { hex=hex.TrimStart('#'); if(hex.Length==6) return Windows.UI.Color.FromArgb(255,Convert.ToByte(hex[..2],16),Convert.ToByte(hex[2..4],16),Convert.ToByte(hex[4..6],16)); if(hex.Length==8) return Windows.UI.Color.FromArgb(Convert.ToByte(hex[..2],16),Convert.ToByte(hex[2..4],16),Convert.ToByte(hex[4..6],16),Convert.ToByte(hex[6..8],16)); } catch(FormatException) { } return Windows.UI.Color.FromArgb(255,211,214,220); }
-    private Button Button(string label,Action action) { var b=new Button { Style=(Style)Application.Current.Resources["NullTVButtonStyle"],Content=label,MinHeight=44,CornerRadius=new CornerRadius(8),Padding=new Thickness(16,8,16,8) }; b.Click+=async (_,_)=> { lastInput=DateTimeOffset.UtcNow; await GuardAsync(()=> { action(); return Task.CompletedTask; }); }; return b; }
+    private Button Button(string label,Action action) { var b=new Button { Style=(Style)Application.Current.Resources["NullTVButtonStyle"],Content=label,MinHeight=44,CornerRadius=new CornerRadius(8),Padding=new Thickness(16,8,16,8) }; b.Click+=async (_,_)=> { ValidationStep("BUTTON:"+label); lastInput=DateTimeOffset.UtcNow; await GuardAsync(()=> { action(); return Task.CompletedTask; }); }; return b; }
     private Button AsyncButton(string label,Func<Task> action) => Button(label,()=>_=GuardAsync(action));
     private async Task GuardAsync(Func<Task> action)
     {
@@ -168,7 +170,7 @@ public sealed partial class MainWindow : Window
             guidePage=null; guidePreview=null; guideVideoExpanded=null; selectGuideChannel=null; refreshGuide=null;
         }
         if(currentTab!="Guide" && tab!=currentTab) { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); }
-        currentTab=tab; playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s));
+        currentTab=tab; UpdatePlayerChrome(); playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s));
         foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .65; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); }
         foreach(var child in pageHost.Children) child.Visibility=Visibility.Collapsed;
         if(tab is "Live TV" or "Now Playing") { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s)); UpdateLiveLayout(); return; }

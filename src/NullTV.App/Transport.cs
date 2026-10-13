@@ -29,7 +29,9 @@ public sealed partial class MainWindow
     private readonly DispatcherTimer transportTimer=new() { Interval=TimeSpan.FromMilliseconds(250) };
     private void ActivateTransport()
     {
-        if(playing==null) { if(lastPlayed!=null) _=GuardAsync(()=>PlayAsync(lastPlayed)); return; }
+        // Replay belongs to the visible empty-state action. A hidden overlay
+        // must never reopen a closed session during focus/layout transitions.
+        if(playing==null) return;
         if(surface?.Player is not { } player) return;
         if(player.State.Idle) { _=GuardAsync(()=>PlayAsync(playing)); return; }
         player.Command("cycle","pause");
@@ -46,8 +48,10 @@ public sealed partial class MainWindow
         if(primaryTransport==null || closed) return;
         var item=playing??lastPlayed; var state=surface?.Player?.State; var running=playing!=null && state?.Idle==false; var live=item?.Kind==MediaKind.Live;
         LabelButton(primaryTransport,running && !state!.Paused ? "\uE769" : "\uE768",running && !state!.Paused ? "Pause" : "Play");
-        primaryTransport.IsEnabled=item!=null;
-        if(stopButton!=null) stopButton.IsEnabled=running;
+        primaryTransport.IsEnabled=playing!=null;
+        UpdateCloseActions();
+        LabelButton(expandButton,expandedVideo || fullscreen ? "\uE73F" : "\uE8A7",expandedVideo || fullscreen ? "Restore app view" : "Expand video in window");
+        LabelButton(fullscreenButton,fullscreen ? "\uE73F" : "\uE740",fullscreen ? "Exit fullscreen" : "Fullscreen");
         if(previousButton!=null) previousButton.Visibility=item?.Kind==MediaKind.Live && !compactVideoControls ? Visibility.Visible : Visibility.Collapsed;
         if(nextButton!=null) nextButton.Visibility=item?.Kind==MediaKind.Live && !compactVideoControls ? Visibility.Visible : Visibility.Collapsed;
         if(rewindButton!=null) { rewindButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; rewindButton.IsEnabled=running && state?.Duration>0; }

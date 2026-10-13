@@ -24,6 +24,7 @@ public sealed partial class MainWindow
     private void UpdateGuideVideoLayout()
     {
         if(currentTab!="Guide" || guidePage==null || guidePreview==null || guideVideoExpanded==null) return;
+        UpdatePlayerChrome();
         var expanded=fullscreen || expandedVideo;
         MoveVideo(expanded ? guideVideoExpanded : guidePreview);
         foreach(var child in guidePage.Children) child.Visibility=ReferenceEquals(child,guideVideoExpanded) ? expanded ? Visibility.Visible : Visibility.Collapsed : expanded || ReferenceEquals(child,guideEmpty) && guideHasRows ? Visibility.Collapsed : Visibility.Visible;

@@ -43,11 +43,9 @@ public sealed partial class MainWindow
     private void ToggleChannelPane() { channelsHidden=!channelsHidden; UpdateLiveLayout(); }
     private void ToggleExpandedVideo()
     {
-        if(currentTab=="Guide") { expandedVideo=!expandedVideo; UpdateGuideVideoLayout(); return; }
-        expandedVideo=!expandedVideo; navigationHidden=expandedVideo; channelsHidden=expandedVideo;
-        if(sidebar!=null) sidebar.Visibility=navigationHidden ? Visibility.Collapsed : Visibility.Visible;
-        root.ColumnDefinitions[0].Width=new(navigationHidden ? 0 : 184);
-        UpdateLiveLayout();
+        if(fullscreen) { ExitPlayerView(); return; }
+        expandedVideo=!expandedVideo;
+        RefreshPlayerView();
     }
     private static bool LightFields=>App.Main?.settings.Appearance.Theme=="Light";
     private string SurfaceHex=>settings.Appearance.Theme=="Light" ? "#FFFFFF" : "#21222C";
