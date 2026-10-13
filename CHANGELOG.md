@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 — 2026-10-12
+
+- Added separate Hide/Show menu and Hide/Show channels controls directly to Guide.
+- Collapsing the channel column gives the schedule the full available width. Compact channel labels keep each row identifiable, and both controls remain available to restore the panels.
+- Wider Guide layouts display more half-hour slots and load the corresponding programs from the existing EPG data, with matching time headings and paging.
+- Guide uses the full content area when both panels are hidden, with a bounded preview and program summary beside it so more of the schedule remains visible. Playback, hover controls and fullscreen stay in Guide.
+
 ## 0.5.2 — 2026-10-12
 
 - Added a navigation toggle in the app header on every tab. Guide, Movies & Series, Now Playing, Media Servers and Settings can collapse and reopen the sidebar without leaving their current page.

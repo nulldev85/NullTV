@@ -170,7 +170,7 @@ public sealed partial class MainWindow : Window
             MoveVideo(videoHome); pageHost.Margin=new Thickness(28,18,28,20);
             if(sidebar!=null) sidebar.Visibility=navigationHidden ? Visibility.Collapsed : Visibility.Visible;
             root.ColumnDefinitions[0].Width=new(navigationHidden ? 0 : 184);
-            guidePage=null; guidePreview=null; guideVideoExpanded=null; selectGuideChannel=null; refreshGuide=null;
+            guidePage=null; guidePreview=null; guideVideoExpanded=null; selectGuideChannel=null; refreshGuide=null; updateGuidePanes=null;
         }
         if(currentTab!="Guide" && tab!=currentTab) { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); }
         currentTab=tab; UpdatePlayerChrome(); playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s));

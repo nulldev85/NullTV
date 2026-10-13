@@ -30,7 +30,7 @@ public sealed partial class MainWindow
         root.ColumnDefinitions[0].Width=new(expanded || navigationHidden ? 0 : 184);
         if(sidebar!=null) sidebar.Visibility=expanded || navigationHidden ? Visibility.Collapsed : Visibility.Visible;
         status.Visibility=expanded ? Visibility.Collapsed : Visibility.Visible;
-        pageHost.Margin=expanded ? new Thickness(0) : new Thickness(28,18,28,20);
+        pageHost.Margin=expanded ? new Thickness(0) : currentTab=="Guide" ? GuideMargin : new Thickness(28,18,28,20);
         if(playerModeBar!=null) playerModeBar.Visibility=expanded ? Visibility.Visible : Visibility.Collapsed;
         if(exitPlayerView!=null) exitPlayerView.Content=currentTab=="Guide" ? "‹  Back to guide" : "‹  Back to player";
         UpdateCloseActions();
