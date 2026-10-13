@@ -53,12 +53,10 @@ public sealed partial class MainWindow
         livePage.RowDefinitions.Add(new() { Height=GridLength.Auto }); livePage.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         livePage.ColumnDefinitions.Add(new() { Width=new(140) }); livePage.ColumnDefinitions.Add(new() { Width=new(304) }); livePage.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
-        actions.Children.Add(IconButton("\uE700","Toggle app navigation",ToggleNavigation));
         actions.Children.Add(IconButton("\uE8A4","Toggle categories",ToggleChannelPane));
         actions.Children.Add(AsyncButton("+  Add source",()=>EditSourceAsync(null)));
         liveHeading=Heading("Live TV","Find something worth watching.",actions); Grid.SetColumnSpan(liveHeading,3); Place(livePage,liveHeading);
         var movieActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
-        movieActions.Children.Add(IconButton("\uE700","Toggle app navigation",ToggleNavigation));
         closeNowPlaying=Button("Close stream",StopPlayback); movieActions.Children.Add(closeNowPlaying);
         backToBrowse=Button("Back to browse",()=> { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); Navigate(playbackOrigin); }); movieActions.Children.Add(backToBrowse);
         libraryPlaybackHeading=Heading("Now playing","Your current stream. One player.",movieActions); libraryPlaybackHeading.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(libraryPlaybackHeading,3); Place(livePage,libraryPlaybackHeading);

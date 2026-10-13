@@ -53,12 +53,15 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar=true;
         root.RowDefinitions.Add(new() { Height=new(58) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto }); root.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto });
         root.ColumnDefinitions.Add(new() { Width=new(184) }); root.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-        var titlebar=new Grid { Padding=new Thickness(24,0,150,0) }; titlebar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); titlebar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
+        var titlebar=new Grid { Padding=new Thickness(16,0,150,0) }; titlebar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); titlebar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var brand=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,VerticalAlignment=VerticalAlignment.Center };
+        navigationToggle=IconButton("\uE700","Hide navigation",ToggleNavigation); navigationToggle.Width=navigationToggle.Height=navigationToggle.MinHeight=32; ((FontIcon)navigationToggle.Content).FontSize=15; brand.Children.Add(navigationToggle);
         brand.Children.Add(new Border { Width=28,Height=28,CornerRadius=new CornerRadius(8),Background=new SolidColorBrush(Color("#BD93F9")),Child=new TextBlock { Text="N",FontSize=16,FontWeight=Microsoft.UI.Text.FontWeights.Bold,Foreground=new SolidColorBrush(Color("#21222C")),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center } });
         brand.Children.Add(new TextBlock { Text="NULLTV",FontSize=13,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold,CharacterSpacing=180,VerticalAlignment=VerticalAlignment.Center }); titlebar.Children.Add(brand);
         profileLabel.Text="ARM64 · YOUR SCREEN, YOUR SOURCES"; profileLabel.FontSize=11; profileLabel.Opacity=.65; profileLabel.VerticalAlignment=VerticalAlignment.Center; Grid.SetColumn(profileLabel,1); titlebar.Children.Add(profileLabel);
         Grid.SetColumnSpan(titlebar,2); root.Children.Add(titlebar); SetTitleBar(titlebar);
+        titlebar.Loaded+=(_,_)=>UpdateNavigationHitRegion();
+        root.LayoutUpdated+=(_,_)=>UpdateNavigationHitRegion();
         navigation.Margin=new Thickness(12,20,12,0);
         var label=Text("LIBRARY",10); label.CharacterSpacing=150; label.Opacity=.4; label.Margin=new Thickness(14,0,0,16); navigation.Children.Add(label);
         var names=new[] { "Live TV","Guide","Movies & Series","Now Playing","Media Servers","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE768","\uE968","\uE713" };

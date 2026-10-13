@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 — 2026-10-12
+
+- Added a navigation toggle in the app header on every tab. Guide, Movies & Series, Now Playing, Media Servers and Settings can collapse and reopen the sidebar without leaving their current page.
+- Guide playback and its current search/order stay in place while the sidebar changes. Showing navigation from an expanded player restores the normal app view and reopens the sidebar.
+- Removed duplicate navigation buttons from page headings and shortened update notes to app changes only.
+
 ## 0.5.1 — 2026-10-12
 
 - Expanded and fullscreen players keep a compact Back and Close stream bar outside the video. Back restores the normal app view; Escape exits the current mode, including from focused player controls or text fields. Nested fullscreen returns to the preceding expanded view.

@@ -25,6 +25,7 @@ public sealed partial class MainWindow
     private void UpdatePlayerChrome()
     {
         var expanded=fullscreen || expandedVideo;
+        LabelButton(navigationToggle,"\uE700",expanded || navigationHidden ? "Show navigation" : "Hide navigation");
         root.RowDefinitions[0].Height=new(fullscreen ? 0 : 58);
         root.ColumnDefinitions[0].Width=new(expanded || navigationHidden ? 0 : 184);
         if(sidebar!=null) sidebar.Visibility=expanded || navigationHidden ? Visibility.Collapsed : Visibility.Visible;

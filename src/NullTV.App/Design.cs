@@ -35,10 +35,8 @@ public sealed partial class MainWindow
     }
     private void ToggleNavigation()
     {
-        navigationHidden=!navigationHidden;
-        if(sidebar!=null) sidebar.Visibility=navigationHidden ? Visibility.Collapsed : Visibility.Visible;
-        root.ColumnDefinitions[0].Width=new(navigationHidden ? 0 : 184);
-        UpdateLiveLayout();
+        if(expandedVideo || fullscreen) { navigationHidden=false; ExitPlayerView(); }
+        else { navigationHidden=!navigationHidden; RefreshPlayerView(); }
     }
     private void ToggleChannelPane() { channelsHidden=!channelsHidden; UpdateLiveLayout(); }
     private void ToggleExpandedVideo()
