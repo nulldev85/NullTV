@@ -26,7 +26,7 @@
 </ResourceDictionary.ThemeDictionaries>
 <CornerRadius x:Key="ControlCornerRadius">10</CornerRadius>
 <ControlTemplate x:Key="NullTVPlaybackThumbTemplate" TargetType="Thumb">
-<Grid Background="Transparent"><Border Width="3" Height="10" CornerRadius="1.5" Background="{TemplateBinding Background}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+<Grid Background="Transparent"><Border Width="2" Height="8" CornerRadius="1" Background="{TemplateBinding Background}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
 </ControlTemplate>
 <ControlTemplate x:Key="NullTVButtonTemplate" TargetType="Button">
 <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">

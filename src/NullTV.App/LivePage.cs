@@ -162,7 +162,7 @@ public sealed partial class MainWindow
         if(liveHeading!=null) liveHeading.Visibility=browse ? Visibility.Visible : Visibility.Collapsed;
         if(libraryPlaybackHeading!=null) libraryPlaybackHeading.Visibility=currentTab=="Now Playing" && !expandedVideo && !fullscreen ? Visibility.Visible : Visibility.Collapsed;
         if(playerHeading!=null) playerHeading.Visibility=expandedVideo || fullscreen ? Visibility.Collapsed : Visibility.Visible;
-        if(backToBrowse!=null) backToBrowse.Content=playbackOrigin=="Guide" ? "Back to guide" : playbackOrigin=="Movies & Series" ? "Back to library" : "Browse channels";
+        if(backToBrowse!=null) backToBrowse.Content=playbackOrigin=="Guide" ? "Back to guide" : playbackOrigin=="Media Servers" ? "Back to server" : playbackOrigin=="Movies & Series" ? "Back to library" : "Browse channels";
         if(playerControls!=null) playerControls.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(controlsCard!=null) controlsCard.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(liveSummary!=null) liveSummary.Text=$"CHANNELS  ·  {items.Count(i=>i.Kind==MediaKind.Live):N0}";
@@ -196,7 +196,7 @@ public sealed partial class MainWindow
         if(request.IsCancellationRequested) return;
         await SaveProgressAsync(); await SyncStoppedAsync();
         var inGuide=currentTab=="Guide" && item.Kind==MediaKind.Live;
-        if(currentTab is "Guide" or "Live TV" or "Movies & Series") playbackOrigin=currentTab;
+        if(currentTab is "Guide" or "Live TV" or "Movies & Series" or "Media Servers") playbackOrigin=currentTab;
         if((item.Kind!=MediaKind.Live || inGuide) && multi) ToggleMulti();
         if(!inGuide) Navigate("Now Playing");
         if(surface==null) return;

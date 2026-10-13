@@ -9,7 +9,7 @@ public sealed partial class MainWindow
     {
         private string state="";
         public string State=>state;
-        public string Kind=>Item.Kind==MediaKind.Series ? "SERIES" : "MOVIE";
+        public string Kind=>Item.Kind switch { MediaKind.Series=>"SERIES",MediaKind.Episode=>"EPISODE",MediaKind.Folder=>"COLLECTION",_=>"MOVIE" };
         public void Update(WatchState? history) { var next=history is null ? "" : history.Watched ? "Watched" : history.Position>0 ? $"Resume {TimeSpan.FromSeconds(history.Position):hh\\:mm\\:ss}" : ""; if(state==next) return; state=next; Changed(nameof(State)); }
     }
     private string librarySearchText="",libraryMode="All",libraryCategory="All categories",libraryProfile="";
@@ -58,8 +58,26 @@ public sealed partial class MainWindow
         if(details.Episodes.Count>0)
         {
             var episodes=new ListView { ItemsSource=details.Episodes,IsItemClickEnabled=true,MaxHeight=350 }; MediaItem? selected=null; episodes.ItemClick+=(_,e)=>selected=e.ClickedItem as MediaItem; panel.Children.Add(Text("Select an episode, then press Play",12)); panel.Children.Add(episodes);
-            if(await DialogAsync("Series details",Scroll(panel),"Play")==ContentDialogResult.Primary && selected!=null) { if(!items.Any(i=>i.Id==selected.Id)) items.Add(selected); await PlayAsync(selected); }
+            if(await DialogAsync("Series details",Scroll(panel),"Play")==ContentDialogResult.Primary && selected!=null) { if(!items.Any(i=>i.Id==selected.Id)) items.Add(selected); await PlayServerMediaAsync(source,selected); }
         }
-        else if(await DialogAsync("Movie details",Scroll(panel),"Play")==ContentDialogResult.Primary && item.Kind!=MediaKind.Series) await PlayAsync(item);
+        else if(await DialogAsync(item.Kind==MediaKind.Episode ? "Episode details" : "Movie details",Scroll(panel),"Play")==ContentDialogResult.Primary && item.Kind!=MediaKind.Series) await PlayServerMediaAsync(source,item);
+    }
+    private async Task PlayServerMediaAsync(Source source,MediaItem item)
+    {
+        if(source.Kind is SourceKind.Jellyfin or SourceKind.Emby)
+        {
+            status.Text="Loading playback versions…";
+            var versions=await new MediaServerClient(http).PlaybackVersionsAsync(source,item,lifetime.Token);
+            if(versions.Count==1) item=versions[0].Item;
+            else
+            {
+                var choice=Choice("Version",versions.Select((version,index)=>$"{index+1}. {version.Name}"),$"1. {versions[0].Name}");
+                var description=Text(versions[0].Description,12); description.Opacity=.75;
+                choice.SelectionChanged+=(_,_)=> { if(choice.SelectedIndex>=0) description.Text=versions[choice.SelectedIndex].Description; };
+                if(await DialogAsync("Choose playback version",Scroll(Stack(Text(item.Name,22),choice,description)),"Play")!=ContentDialogResult.Primary) return;
+                item=versions[choice.SelectedIndex].Item;
+            }
+        }
+        await PlayAsync(item);
     }
 }

@@ -68,6 +68,7 @@ public sealed partial class MainWindow
     {
         private readonly TextBox input;
         public string Text { get=>input.Text; set=>input.Text=value; }
+        public void Compact() { MinHeight=input.MinHeight=34; input.Padding=new Thickness(12,6,36,6); }
         public event TextChangedEventHandler? TextChanged;
         public SearchField(string placeholder)
         {

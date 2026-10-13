@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace NullTV.Core;
 
 public enum SourceKind { Xtream, PlaylistUrl, PlaylistFile, Jellyfin, Emby, Plex }
-public enum MediaKind { Live, Movie, Series, Episode }
+public enum MediaKind { Live, Movie, Series, Episode, Folder }
 public sealed class Source
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -33,6 +33,12 @@ public sealed record MediaItem(string Id, string SourceId, string Name, string C
     public string Catchup { get; init; } = "";
     public string CatchupTemplate { get; init; } = "";
     public Dictionary<string, string> Headers { get; init; } = [];
+    public string LibraryId { get; init; } = "";
+    public string ServerType { get; init; } = "";
+    public string Overview { get; init; } = "";
+    public string Year { get; init; } = "";
+    public string MediaSourceId { get; init; } = "";
+    public string PlaySessionId { get; init; } = "";
     public override string ToString() => Name;
 }
 public sealed record Programme(string ChannelId, string Title, string Description, DateTimeOffset Start, DateTimeOffset End)
@@ -48,9 +54,24 @@ public sealed record Programme(string ChannelId, string Title, string Descriptio
     public override string ToString() => $"{TimeLabel}  {Title}";
 }
 public sealed record MediaDetails(string Plot, string Cast, string Rating, List<MediaItem> Episodes);
+public sealed record ServerLibrary(string Id,string Name,string CollectionType,string Logo,bool GenreRequired)
+{
+    public List<string> Genres { get; init; } = [];
+    public string DefaultGenre { get; init; } = "";
+    public List<MediaItem> Items { get; init; } = [];
+}
+public sealed record ServerRow(string Name,List<MediaItem> Items);
+public sealed record ServerPage(List<MediaItem> Items,int StartIndex,int? Total,bool HasMore)
+{
+    public Dictionary<string,WatchState> RemoteHistory { get; init; } = [];
+}
+public sealed record PlaybackVersion(string Id,string Name,string Description,MediaItem Item);
 public sealed record Catalog(List<MediaItem> Items, string EpgUrl, string Status, DateTimeOffset? Expires)
 {
     public Dictionary<string,WatchState> RemoteHistory { get; init; } = [];
+    public List<ServerLibrary> Libraries { get; init; } = [];
+    public List<ServerRow> ServerRows { get; init; } = [];
+    public bool HasServerLibraries { get; init; }
 }
 public sealed class Profile
 {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.4 — 2026-10-12
+
+- Media Servers now opens a dedicated server library view with catalog names/order, Continue Watching, Next Up, collections, search, genre filters and paging. Jellyfin/AIOStreams libraries that require a genre are populated using their offered All/first genre instead of showing a connected server with zero items.
+- Stream versions load when Play is pressed; browsing no longer resolves streams for every title. Server version names are selectable, and playback can return to the same server browser.
+- Jellyfin login, playback and progress requests use the correct field names, with the selected version and session retained for progress sync.
+- Volume and progress tracks meet their smaller green position markers without a gap.
+- Guide has a thinner search/time toolbar, lighter frame and tighter preview spacing. The EPG reaches the content edges and bottom, with status information moved into the Guide heading.
+
 ## 0.5.3 — 2026-10-12
 
 - Added separate Hide/Show menu and Hide/Show channels controls directly to Guide.

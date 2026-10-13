@@ -20,10 +20,15 @@ public sealed partial class MainWindow
     }
     private UIElement BuildServers()
     {
+        var selected=settings.Profile.Sources.FirstOrDefault(source=>source.Id==serverBrowseId && source.Kind is SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex);
+        if(selected!=null) return BuildServerBrowser(selected);
         var page=Stack(Heading("Media servers","Bring your library. Keep your place."));
         foreach(var source in settings.Profile.Sources.Where(s=>s.Kind is SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex))
         {
-            var s=source; page.Children.Add(Stack(Text(s.Name,20),Text(s.AccountStatus,12),AsyncButton("Browse / refresh library",async ()=> { catalogs[s.Id]=await new MediaServerClient(http).BrowseAsync(s,lifetime.Token); await store.SaveCacheAsync(s.Id,catalogs[s.Id]); await store.SaveAsync(settings); RebuildItems(); Navigate("Movies & Series"); })));
+            var s=source; var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
+            actions.Children.Add(Button("Browse libraries",()=>OpenServerBrowser(s)));
+            actions.Children.Add(AsyncButton("Refresh",async ()=> { await RefreshServerCatalogAsync(s); OpenServerBrowser(s); }));
+            page.Children.Add(Card(Stack(Text(s.Name,20),Text(s.AccountStatus,12),actions),new Thickness(20)));
         }
         var connectors=new Grid { ColumnSpacing=16 }; for(int i=0;i<3;i++) connectors.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         Border Connector(string name,string asset,string description,string action,Func<Task> connect)
@@ -53,7 +58,7 @@ public sealed partial class MainWindow
         var kind=Choice("Server",new[]{"Jellyfin","Emby"},serverKind.ToString()); var name=Field("Server name"); var address=Field("Server URL (include /emby if required)"); var user=Field("Username (for login)"); var password=new PasswordBox { Style=(Style)Application.Current.Resources["NullTVPasswordBoxStyle"],Foreground=FieldText(),Background=FieldFill(),BorderBrush=FieldStroke(),CornerRadius=new CornerRadius(10), Header="Password (for login)",MinHeight=68 }; var key=new PasswordBox { Style=(Style)Application.Current.Resources["NullTVPasswordBoxStyle"],Foreground=FieldText(),Background=FieldFill(),BorderBrush=FieldStroke(),CornerRadius=new CornerRadius(10), Header="API key (alternative)",MinHeight=68 }; var userId=Field("User ID (required for server API keys)");
         if(await DialogAsync("Connect media server",Scroll(Stack(kind,name,address,user,password,key,userId)),"Connect")!=ContentDialogResult.Primary) return;
         var s=new Source { Kind=Enum.Parse<SourceKind>((string)kind.SelectedItem),Name=name.Text.Trim(),Address=address.Text.Trim(),Username=user.Text,Password=password.Password,ApiKey=key.Password,UserId=userId.Text.Trim() }; if(s.Name=="") s.Name=s.Kind.ToString();
-        var c=await new MediaServerClient(http).BrowseAsync(s,lifetime.Token); settings.Profile.Sources.Add(s); catalogs[s.Id]=c; s.Password=""; await store.SaveCacheAsync(s.Id,c); await store.SaveAsync(settings); RebuildItems(); Navigate("Movies & Series");
+        var c=await new MediaServerClient(http).BrowseAsync(s,lifetime.Token); settings.Profile.Sources.Add(s); catalogs[s.Id]=c; s.Password=""; await store.SaveCacheAsync(s.Id,c); await store.SaveAsync(settings); RebuildItems(); OpenServerBrowser(s);
     }
     private async Task EditServerAsync(Source s)
     {
@@ -66,6 +71,6 @@ public sealed partial class MainWindow
         var s=new Source { Kind=SourceKind.Plex,Name="Plex" }; var pin=await MediaServerClient.PlexPinAsync(http,s.Id,lifetime.Token);
         var code=Text(pin.Code,30); var address=Field("Plex server URL (your own server)"); var panel=Stack(Text("Open plex.tv/link and enter this code:"),code,Button("Open Plex link",()=>_=Windows.System.Launcher.LaunchUriAsync(new Uri("https://plex.tv/link"))),address);
         if(await DialogAsync("Plex sign-in",panel,"Finish sign-in")!=ContentDialogResult.Primary) return;
-        s.ApiKey=await MediaServerClient.PollPlexPinAsync(http,s.Id,pin.Id,lifetime.Token)??throw new InvalidDataException("The PIN has not been authorized or has expired. Sign in in the browser and try again."); s.Address=address.Text.Trim(); var c=await new MediaServerClient(http).BrowseAsync(s,lifetime.Token); settings.Profile.Sources.Add(s); catalogs[s.Id]=c; await store.SaveCacheAsync(s.Id,c); await store.SaveAsync(settings); RebuildItems(); Navigate("Movies & Series");
+        s.ApiKey=await MediaServerClient.PollPlexPinAsync(http,s.Id,pin.Id,lifetime.Token)??throw new InvalidDataException("The PIN has not been authorized or has expired. Sign in in the browser and try again."); s.Address=address.Text.Trim(); var c=await new MediaServerClient(http).BrowseAsync(s,lifetime.Token); settings.Profile.Sources.Add(s); catalogs[s.Id]=c; await store.SaveCacheAsync(s.Id,c); await store.SaveAsync(settings); RebuildItems(); OpenServerBrowser(s);
     }
 }

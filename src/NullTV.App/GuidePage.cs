@@ -15,7 +15,7 @@ public sealed partial class MainWindow
     private bool guideChannelsHidden;
     private int guideSlots=4;
     private Action? updateGuidePanes;
-    private Thickness GuideMargin=>navigationHidden && guideChannelsHidden ? new Thickness(16,12,16,16) : new Thickness(28,18,28,20);
+    private Thickness GuideMargin=>new(0,8,0,0);
     private Action<MediaItem>? selectGuideChannel;
     private void MoveVideo(Border? destination)
     {
@@ -59,7 +59,7 @@ public sealed partial class MainWindow
     private UIElement BuildGuide()
     {
         var profile=settings.Profile;
-        var page=new Grid { RowSpacing=12 };
+        var page=new Grid { RowSpacing=6 };
         guidePage=page;
         for(int n=0;n<3;n++) page.RowDefinitions.Add(new() { Height=GridLength.Auto });
         page.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
@@ -68,7 +68,10 @@ public sealed partial class MainWindow
         var channelsToggle=Button("",()=> { guideChannelsHidden=!guideChannelsHidden; UpdateGuideVideoLayout(); });
         foreach(var button in new[]{menuToggle,channelsToggle}) { button.Padding=new Thickness(10,8,10,8); button.FontSize=12; actions.Children.Add(button); }
         actions.Children.Add(AsyncButton("Refresh guide",()=>RefreshAllAsync(true)));
-        var heading=Heading("Guide","Your favorite channels. Your order.",actions); heading.Margin=new Thickness(0); Place(page,heading);
+        foreach(var button in actions.Children.OfType<Button>()) { button.MinHeight=button.Height=34; button.Padding=new Thickness(10,6,10,6); }
+        var heading=Heading("Guide","Your favorite channels. Your order.",actions); heading.Margin=new Thickness(12,0,12,2);
+        if(heading.Children[0] is StackPanel headingCopy && headingCopy.Children[1] is TextBlock caption) caption.SetBinding(TextBlock.TextProperty,new Binding { Source=status,Path=new PropertyPath(nameof(TextBlock.Text)) });
+        Place(page,heading);
         MediaItem? selectedChannel=null; Programme? selectedShow=null;
         var info=new Grid { ColumnSpacing=20 }; info.ColumnDefinitions.Add(new() { Width=new(360) }); info.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         guidePreview=Card(new Grid(),new Thickness(0)); guidePreview.CornerRadius=new CornerRadius(10);
@@ -83,7 +86,7 @@ public sealed partial class MainWindow
         var infoDetails=new Grid(); Place(infoDetails,copy); Place(info,infoDetails,0,1);
         // Keep the summary within the preview's height without a redundant action row.
         preview.SizeChanged+=(_,_)=>infoDescription.MaxLines=Math.Max(2,(int)((preview.ActualHeight-92)/17));
-        var infoCard=Card(info,new Thickness(18,14,18,14)); Place(page,infoCard,1);
+        var infoCard=Card(info,new Thickness(12,8,12,8)); infoCard.CornerRadius=new CornerRadius(8); infoCard.BorderThickness=new Thickness(.5); infoCard.Margin=new Thickness(8,0,8,0); Place(page,infoCard,1);
         void UpdateInfo()
         {
             if(selectedChannel==null || selectedShow==null) return;
@@ -104,24 +107,26 @@ public sealed partial class MainWindow
             if(selectedShow!=null) UpdateInfo();
             else { infoContext.Text=$"LIVE CHANNEL  ·  {channel.Number:000}  {channel.Name}"; infoTitle.Text=channel.Name; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Program information is unavailable. Live playback is still available here."; }
         };
-        var search=SearchBox("Search favorites or programs"); search.Width=280;
+        var search=SearchBox("Search favorites or programs"); search.Width=280; search.Compact();
         var controls=new Grid { ColumnSpacing=16 }; controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); controls.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var timeActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6 };
         timeActions.Children.Add(IconButton("\uE76B","Previous schedule window",()=> { guideStart=guideStart.AddMinutes(-guideSlots*30); refreshGuide?.Invoke(); }));
         var now=Button("Now",()=> { guideStart=HalfHour(DateTimeOffset.Now); refreshGuide?.Invoke(); }); now.Foreground=new SolidColorBrush(Color(LightFields ? "#A39514" : "#F1FA8C")); timeActions.Children.Add(now);
         timeActions.Children.Add(IconButton("\uE76C","Next schedule window",()=> { guideStart=guideStart.AddMinutes(guideSlots*30); refreshGuide?.Invoke(); })); Place(controls,timeActions);
-        var date=Text(guideStart.LocalDateTime.ToString("ddd, dd MMM  ·  HH:mm")+"  ·  Local time",12); date.VerticalAlignment=VerticalAlignment.Center; Place(controls,date,0,1); Place(controls,search,0,2); Place(page,Card(controls,new Thickness(8)),2);
+        foreach(var button in timeActions.Children.OfType<Button>()) { button.MinHeight=button.Height=32; button.MinWidth=0; button.Padding=new Thickness(10,4,10,4); if(button.Content is FontIcon) button.Width=32; }
+        var date=Text(guideStart.LocalDateTime.ToString("ddd, dd MMM  ·  HH:mm")+"  ·  Local time",11); date.VerticalAlignment=VerticalAlignment.Center; Place(controls,date,0,1); Place(controls,search,0,2);
+        var toolbar=Card(controls,new Thickness(8,2,8,2)); toolbar.BorderThickness=new Thickness(0); toolbar.CornerRadius=new CornerRadius(0); Place(page,toolbar,2);
         var rows=new ObservableCollection<GuideRow>();
         var list=new ListView { ItemsSource=rows,SelectionMode=ListViewSelectionMode.None,IsSwipeEnabled=true };
         QuietItems(list); WatchArtwork(list,88);
         list.ItemContainerStyle=new Style(typeof(ListViewItem)) { Setters={ new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch),new Setter(Control.PaddingProperty,new Thickness(0)) } };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list,"Favorite channel guide. Drag grips to reorder, or use channel options.");
         list.ItemTemplate=(DataTemplate)XamlReader.Load("<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><Grid Height='84' Margin='0,3' Background='Transparent'/></DataTemplate>");
-        var body=new Grid { RowSpacing=8 }; body.RowDefinitions.Add(new() { Height=GridLength.Auto }); body.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
+        var body=new Grid { RowSpacing=4 }; body.RowDefinitions.Add(new() { Height=GridLength.Auto }); body.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         var header=new Grid { ColumnSpacing=12 }; header.ColumnDefinitions.Add(new() { Width=new(280) }); header.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var summary=Text("FAVORITE CHANNELS",10); summary.CharacterSpacing=100; summary.Foreground=new SolidColorBrush(Color(LightFields ? "#A39514" : "#F1FA8C")); Place(header,summary);
         var hours=new Grid(); for(int n=0;n<4;n++) { hours.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); var time=Text(guideStart.AddMinutes(n*30).LocalDateTime.ToString("HH:mm"),11); time.Opacity=.7; Place(hours,time,0,n); } Place(header,hours,0,1);
-        Place(body,header); Place(body,list,1); Place(page,Card(body,new Thickness(12)),3);
+        Place(body,header); Place(body,list,1); var schedule=Card(body,new Thickness(4,6,4,0)); schedule.CornerRadius=new CornerRadius(0); schedule.BorderThickness=new Thickness(0,.5,0,0); Place(page,schedule,3);
         var empty=Card(EmptyState("\uE735","Build your favorite guide.","Star channels in Live TV and they will appear here, ready to arrange.","Choose favorite channels",()=> { Navigate("Live TV"); return Task.CompletedTask; })); Place(page,empty,3);
         guideEmpty=empty;
         CancellationTokenSource? pending=null; bool refreshPending=false,unloaded=false;
@@ -145,7 +150,7 @@ public sealed partial class MainWindow
             // Reserve room for the EPG even in a wide app window; the summary stays beside the preview.
             if(info.ActualWidth>0 && page.ActualHeight>0)
             {
-                var maxPreviewWidth=Math.Min(460,Math.Max(140,page.ActualHeight*.32)*16/9);
+                var maxPreviewWidth=Math.Min(400,Math.Max(140,Math.Min(200,page.ActualHeight*.26))*16/9);
                 var previewWidth=Math.Min(Math.Max(240,info.ActualWidth*.38),maxPreviewWidth);
                 if(Math.Abs(info.ColumnDefinitions[0].Width.Value-previewWidth)>.5) info.ColumnDefinitions[0].Width=new(previewWidth);
             }
