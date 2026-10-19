@@ -68,7 +68,7 @@ public sealed partial class MainWindow
         channelList=new ListView { IsItemClickEnabled=true,SelectionMode=ListViewSelectionMode.Single };
         channelList.ItemTemplate=(DataTemplate)XamlReader.Load("""
 <DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
-<Border Margin='4' Padding='12' CornerRadius='10' BorderThickness='.5' BorderBrush='#44475A' Background='{ThemeResource NullTVFieldBackground}'>
+<Border Margin='4' Padding='12' CornerRadius='10' BorderThickness='.5' BorderBrush='#6044475A' Background='{ThemeResource NullTVFieldBackground}'>
 <Grid ColumnSpacing='10'><Grid.ColumnDefinitions><ColumnDefinition Width='44'/><ColumnDefinition Width='*'/><ColumnDefinition Width='28'/></Grid.ColumnDefinitions>
 <Grid Width='42' Height='42'><FontIcon Glyph='&#xE714;' FontSize='20' Opacity='.3'/><Image Source='{Binding Artwork}' Stretch='Uniform'/></Grid>
 <StackPanel Grid.Column='1' Spacing='6' VerticalAlignment='Center'><TextBlock Text='{Binding DisplayName}' FontSize='13' FontWeight='SemiBold' TextTrimming='CharacterEllipsis'/><StackPanel x:Name='ChannelQualityBadges' Orientation='Horizontal' Spacing='4'/><TextBlock Text='{Binding NowNext}' FontSize='11' Opacity='.65' TextTrimming='CharacterEllipsis' TextWrapping='Wrap' MaxLines='2'/></StackPanel>
@@ -97,7 +97,7 @@ public sealed partial class MainWindow
         var goLive=Button("●  LIVE",()=>_=GuardAsync(GoLiveAsync)); goLive.Padding=new Thickness(12,4,12,4); goLive.MinHeight=32; goLive.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B")); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(goLive,"Go live"); ToolTipService.SetToolTip(goLive,"Return to the current live feed"); Place(liveBar,goLive);
         livePositionLabel=Text("Watching live",11); livePositionLabel.VerticalAlignment=VerticalAlignment.Center; Place(liveBar,livePositionLabel,0,1);
         liveBar.RowDefinitions.Add(new() { Height=GridLength.Auto }); liveBar.RowDefinitions.Add(new() { Height=GridLength.Auto });
-        var liveTrack=new Border { Height=2,CornerRadius=new CornerRadius(1),Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B")),Margin=new Thickness(4,1,4,0) }; Grid.SetColumnSpan(liveTrack,2); Place(liveBar,liveTrack,1);
+        var liveTrack=PolishedProgressBar.Create(value:100); liveTrack.Margin=new Thickness(4,3,4,0); Grid.SetColumnSpan(liveTrack,2); Place(liveBar,liveTrack,1);
         playerControls=new Grid { ColumnSpacing=8,HorizontalAlignment=HorizontalAlignment.Center }; playerControls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); playerControls.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var transport=new StackPanel { Orientation=Orientation.Horizontal,Spacing=3 }; var tools=new StackPanel { Orientation=Orientation.Horizontal,Spacing=3 };
         previousButton=IconButton("\uE892","Previous channel",()=>ChannelStep(-1)); transport.Children.Add(previousButton);
@@ -119,13 +119,13 @@ public sealed partial class MainWindow
         streamInfo=Text("Waiting for stream information…",11); streamInfo.LineHeight=22; streamInfo.TextWrapping=TextWrapping.NoWrap; streamInfo.TextTrimming=TextTrimming.CharacterEllipsis;
         var infoHeading=Text("STREAM INFO",10); infoHeading.CharacterSpacing=120; infoHeading.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#F1FA8C"));
         var infoContent=Stack(infoHeading,streamInfo); infoContent.Spacing=8; var infoCard=Card(infoContent,new Thickness(14)); infoCard.CornerRadius=new CornerRadius(14);
-        foreach(var card in new[]{transportCard,infoCard}) { card.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#B021222C")); card.BorderBrush=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#30F8F8F2")); card.BorderThickness=new Thickness(.5); card.CornerRadius=new CornerRadius(8); card.HorizontalAlignment=HorizontalAlignment.Left; card.VerticalAlignment=VerticalAlignment.Top; }
+        foreach(var card in new[]{transportCard,infoCard}) { card.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#B021222C")); card.BorderBrush=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#18F8F8F2")); card.BorderThickness=new Thickness(.5); card.CornerRadius=new CornerRadius(12); card.HorizontalAlignment=HorizontalAlignment.Left; card.VerticalAlignment=VerticalAlignment.Top; }
         transportCard.RequestedTheme=infoCard.RequestedTheme=ElementTheme.Dark;
         foreach(var entry in root.Resources) transportCard.Resources[entry.Key]=entry.Value;
         foreach(var slider in new[]{seek,volumeControl})
         {
             var green=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#50FA7B"));
-            slider.Foreground=green; slider.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#44475A")); slider.Resources["SliderTrackThemeHeight"]=2d;
+            slider.Foreground=green; slider.Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color("#44475A")); slider.Resources["SliderTrackThemeHeight"]=3d;
             foreach(var key in new[]{"SliderTrackValueFill","SliderTrackValueFillPointerOver","SliderTrackValueFillPressed","SliderThumbBackground","SliderThumbBackgroundPointerOver","SliderThumbBackgroundPressed","AccentFillColorDefaultBrush","AccentFillColorSecondaryBrush","AccentFillColorTertiaryBrush"}) slider.Resources[key]=green;
         }
         transportCard.KeyDown+=OnKey;

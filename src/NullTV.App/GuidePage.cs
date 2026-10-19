@@ -61,9 +61,9 @@ public sealed partial class MainWindow
         rail=new(this,guideSelection,guideRailCollapsed,selection=> { guideSelection=selection; refreshGuide?.Invoke(); },collapsed=> { guideRailCollapsed=collapsed; page.ColumnDefinitions[0].Width=new(collapsed ? 56 : 240); }); guideCategoryRail=rail; Place(page,rail);
         updateGuidePanes=()=>page.ColumnDefinitions[0].Width=new(fullscreen || expandedVideo ? 0 : guideRailCollapsed ? 56 : 240);
         MediaItem? selectedChannel=null; Programme? selectedShow=null;
-        var info=new Grid { ColumnSpacing=18,Padding=new Thickness(16,12,16,12),BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,0,0,.5) };
+        var info=new Grid { ColumnSpacing=18,Padding=new Thickness(16,12,16,12),BorderBrush=SoftStroke(),BorderThickness=new Thickness(0,0,0,.5) };
         info.ColumnDefinitions.Add(new() { Width=new(288) }); info.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-        guidePreview=Card(new Grid(),new Thickness(0)); guidePreview.Height=162; guidePreview.CornerRadius=new CornerRadius(8); Place(info,guidePreview);
+        guidePreview=Card(new Grid(),new Thickness(0)); guidePreview.Height=162; guidePreview.CornerRadius=new CornerRadius(12); Place(info,guidePreview);
         var context=Text("LIVE TV GUIDE",10); context.CharacterSpacing=100; context.Foreground=new SolidColorBrush(Color("#50FA7B")); context.TextWrapping=TextWrapping.NoWrap; context.TextTrimming=TextTrimming.CharacterEllipsis;
         var title=Text("Choose a channel or live program",20); title.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; title.TextWrapping=TextWrapping.NoWrap; title.TextTrimming=TextTrimming.CharacterEllipsis;
         var meta=Text("",11); meta.Foreground=new SolidColorBrush(Color("#BD93F9")); meta.TextWrapping=TextWrapping.NoWrap; meta.TextTrimming=TextTrimming.CharacterEllipsis;
@@ -100,8 +100,8 @@ public sealed partial class MainWindow
         QuietItems(list); WatchArtwork(list,96); ScrollViewer.SetHorizontalScrollMode(list,ScrollMode.Disabled);
         list.ItemContainerStyle=new Style(typeof(ListViewItem)) { Setters={new Setter(Control.PaddingProperty,new Thickness(0)),new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch),new Setter(Control.MinHeightProperty,rowHeight)} };
         list.ItemTemplate=(DataTemplate)XamlReader.Load("<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><Grid Height='88' Background='Transparent'/></DataTemplate>");
-        var body=new Grid { BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,.5,0,0) }; body.RowDefinitions.Add(new() { Height=new(34) }); body.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); body.RowDefinitions.Add(new() { Height=new(12) });
-        var header=new Grid { BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,0,0,.5) }; header.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); header.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        var body=new Grid { BorderBrush=SoftStroke(),BorderThickness=new Thickness(0,.5,0,0) }; body.RowDefinitions.Add(new() { Height=new(34) }); body.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); body.RowDefinitions.Add(new() { Height=new(12) });
+        var header=new Grid { BorderBrush=SoftStroke(),BorderThickness=new Thickness(0,0,0,.5) }; header.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); header.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var count=Text("CHANNELS",10); count.CharacterSpacing=100; count.Margin=new Thickness(16,0,0,0); count.Opacity=.65; count.VerticalAlignment=VerticalAlignment.Center; Place(header,count);
         var hours=new Canvas { Width=timelineWidth,Height=33 };
         var headerScroll=new ScrollViewer { Content=hours,HorizontalScrollMode=ScrollMode.Enabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollMode=ScrollMode.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled }; Place(header,headerScroll,0,1); Place(body,header);
@@ -120,13 +120,13 @@ public sealed partial class MainWindow
         headerScroll.ViewChanged+=(_,_)=> { if(!scrolling) SetOffset(headerScroll.HorizontalOffset); };
         headerScroll.SizeChanged+=(_,_)=> { scroll.Maximum=Math.Max(0,timelineWidth-headerScroll.ActualWidth); scroll.ViewportSize=headerScroll.ActualWidth; SetOffset(offset); };
         list.AddHandler(UIElement.PointerWheelChangedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,e)=> { var properties=e.GetCurrentPoint(list).Properties; if(properties.IsHorizontalMouseWheel) { SetOffset(offset+properties.MouseWheelDelta); e.Handled=true; } }),true);
-        var tick=new DispatcherTimer { Interval=TimeSpan.FromSeconds(15) };
+        var tick=new DispatcherTimer { Interval=TimeSpan.FromSeconds(1) };
         Border? headerNow=null; var clockNow=DateTimeOffset.Now;
         void BuildHours()
         {
             hours.Children.Clear(); date.Text=guideStart.LocalDateTime.ToString("ddd, dd MMM");
             for(int n=0;n<6;n++) { var line=new Border { Width=1,Height=34,Background=new SolidColorBrush(Color("#44475A")) }; Canvas.SetLeft(line,n*240); hours.Children.Add(line); var time=Text(guideStart.AddHours(n).LocalDateTime.ToString("HH:mm"),12); time.Opacity=.75; Canvas.SetLeft(time,n*240+10); Canvas.SetTop(time,9); hours.Children.Add(time); }
-            headerNow=new Border { Background=new SolidColorBrush(Color("#FF79C6")),Padding=new Thickness(5,1,5,1),CornerRadius=new CornerRadius(4),Child=new TextBlock { Text=DateTimeOffset.Now.ToString("HH:mm"),FontSize=10,Foreground=new SolidColorBrush(Color("#282A36")) } }; hours.Children.Add(headerNow);
+            headerNow=new Border { Background=new SolidColorBrush(Color("#FF79C6")),Padding=new Thickness(5,1,5,1),CornerRadius=new CornerRadius(6),Child=new TextBlock { Text=DateTimeOffset.Now.ToString("HH:mm"),FontSize=10,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold,Foreground=new SolidColorBrush(Color("#282A36")) } }; hours.Children.Add(headerNow);
             clockNow=DateTimeOffset.Now; UpdateClock();
         }
         void UpdateClock()
@@ -147,8 +147,8 @@ public sealed partial class MainWindow
             if(args.ItemContainer.ContentTemplateRoot is not Grid grid) return;
             if(args.InRecycleQueue) { timelines.Remove(grid); updates.Remove(grid); qualityUpdates.Remove(grid); return; }
             if(args.Item is not GuideRow row) return;
-            grid.Children.Clear(); grid.ColumnDefinitions.Clear(); grid.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); grid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); grid.BorderBrush=new SolidColorBrush(Color("#44475A")); grid.BorderThickness=new Thickness(0,0,0,.5);
-            var channel=new Grid { Padding=new Thickness(8,0,8,0),ColumnSpacing=8,Background=new SolidColorBrush(Color("#21222C")),BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,0,.5,0) };
+            grid.Children.Clear(); grid.ColumnDefinitions.Clear(); grid.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); grid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); grid.BorderBrush=SoftStroke(); grid.BorderThickness=new Thickness(0,0,0,.5);
+            var channel=new Grid { Padding=new Thickness(8,0,8,0),ColumnSpacing=8,Background=new SolidColorBrush(Color("#21222C")),BorderBrush=SoftStroke(),BorderThickness=new Thickness(0,0,.5,0) };
             channel.ColumnDefinitions.Add(new() { Width=new(18) }); channel.ColumnDefinitions.Add(new() { Width=new(40) }); channel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); channel.ColumnDefinitions.Add(new() { Width=new(28) });
             if(guideSelection.Scope==ChannelScope.Favorites && (string)sort.SelectedItem=="Default order") Place(channel,reorder.Grip(row,grid));
             var logo=new Grid { Width=38,Height=38 }; logo.Children.Add(new FontIcon { Glyph="\uE714",FontSize=18,Opacity=.3 }); var image=new Image { Stretch=Stretch.Uniform }; image.SetBinding(Image.SourceProperty,new Binding { Source=row,Path=new PropertyPath(nameof(ArtworkRow.Artwork)) }); logo.Children.Add(image); Place(channel,logo,0,1);
@@ -167,16 +167,16 @@ public sealed partial class MainWindow
                 var programTitle=Text(show.Title,13); programTitle.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; programTitle.TextWrapping=TextWrapping.NoWrap; programTitle.TextTrimming=TextTrimming.CharacterEllipsis;
                 var time=Text(show.TimeLabel,11); time.Opacity=.68; time.TextWrapping=TextWrapping.NoWrap; time.TextTrimming=TextTrimming.CharacterEllipsis;
                 var flag=Text(show.IsPremiere ? "PREMIERE" : show.IsNew ? "NEW" : "",9); flag.Foreground=new SolidColorBrush(Color("#F1FA8C")); flag.Visibility=flag.Text=="" ? Visibility.Collapsed : Visibility.Visible;
-                var fill=new Border { Width=0,Height=2,CornerRadius=new CornerRadius(1),Background=new SolidColorBrush(Color("#50FA7B")),HorizontalAlignment=HorizontalAlignment.Left };
                 var trackLeft=segment.Left+2; var trackWidth=Math.Max(0,segment.Width-4);
-                var progress=new Border { Width=trackWidth,Height=2,CornerRadius=new CornerRadius(1),Background=new SolidColorBrush(Color("#44475A")),Child=fill,IsHitTestVisible=false };
+                var progress=PolishedProgressBar.Create(Math.Max(1,trackWidth),animate:false); progress.Width=trackWidth;
                 var copyStack=Stack(programTitle,time,flag); copyStack.Spacing=4; var content=new Grid(); content.Children.Add(copyStack);
-                var cell=Button("",()=> { SelectProgram(row.Channel,show); if(show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now) _=GuardAsync(()=>PlayAsync(row.Channel)); foreach(var update in updates.Values) update(); }); cell.Content=content; cell.MinWidth=cell.MinHeight=0; cell.Height=80; cell.Width=Math.Max(1,segment.Width-4); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(6); cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.VerticalContentAlignment=VerticalAlignment.Stretch;
+                var cell=Button("",()=> { SelectProgram(row.Channel,show); if(show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now) _=GuardAsync(()=>PlayAsync(row.Channel)); foreach(var update in updates.Values) update(); }); cell.Content=content; cell.MinWidth=cell.MinHeight=0; cell.Height=80; cell.Width=Math.Max(1,segment.Width-4); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(8); cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.VerticalContentAlignment=VerticalAlignment.Stretch;
                 ToolTipService.SetToolTip(cell,show.Title+" · "+show.TimeLabel); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(cell,row.Channel.Name+", "+show.Title+", "+show.TimeLabel);
                 cell.RightTapped+=(_,e)=> { _=GuardAsync(()=>ProgrammeDetailsAsync(row.Channel,show)); e.Handled=true; };
                 Canvas.SetLeft(cell,segment.Left+2); Canvas.SetTop(cell,4); canvas.Children.Add(cell);
                 Canvas.SetLeft(progress,trackLeft); Canvas.SetTop(progress,73); canvas.Children.Add(progress);
-                cellUpdates.Add(()=> { var live=show.Start<=clockNow && show.End>clockNow; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start; cell.Background=new SolidColorBrush(Color(live ? "#403A52" : "#282A36")); cell.BorderBrush=new SolidColorBrush(Color(live || selected ? "#BD93F9" : "#282A36")); cell.BorderThickness=new Thickness(live || selected ? 1 : 0); progress.Visibility=live ? Visibility.Visible : Visibility.Collapsed; fill.Width=GuideGeometry.ElapsedWidth(clockNow,row.Start,trackLeft,trackWidth); });
+                bool? wasLive=null,wasSelected=null;
+                cellUpdates.Add(()=> { var live=show.Start<=clockNow && show.End>clockNow; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start; if(wasLive!=live || wasSelected!=selected) { wasLive=live; wasSelected=selected; cell.Background=new SolidColorBrush(Color(live ? "#383345" : "#282A36")); cell.BorderBrush=new SolidColorBrush(Color(selected ? "#BD93F9" : live ? "#70BD93F9" : "#282A36")); cell.BorderThickness=new Thickness(live || selected ? 1 : 0); } progress.Visibility=live ? Visibility.Visible : Visibility.Collapsed; progress.Value=GuideGeometry.ElapsedWidth(clockNow,row.Start,trackLeft,trackWidth); });
             }
             var marker=new Border { Width=1.5,Height=rowHeight,Background=new SolidColorBrush(Color("#FF79C6")),IsHitTestVisible=false }; canvas.Children.Add(marker);
             updates[grid]=()=> { foreach(var update in cellUpdates) update(); current.Text=row.Shows.FirstOrDefault(show=>show.Start<=clockNow && show.End>clockNow)?.Title??"No program data"; var x=GuideGeometry.Position(clockNow,row.Start); marker.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; Canvas.SetLeft(marker,x-marker.Width/2); };

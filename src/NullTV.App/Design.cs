@@ -6,6 +6,10 @@ using NullTV.Core;
 namespace NullTV.App;
 public sealed partial class MainWindow
 {
+    internal static bool MotionEnabled=>App.Main?.settings.Appearance.ReducedMotion!=true && new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
+    private Brush PanelBrush()=>settings.Appearance.Theme=="Light" ? new SolidColorBrush(Color("#FFFFFF")) : new LinearGradientBrush {
+        StartPoint=new(0,0),EndPoint=new(1,1),GradientStops={new GradientStop { Color=Color("#282A36"),Offset=0 },new GradientStop { Color=Color("#21222C"),Offset=1 }} };
+    private static Brush SoftStroke()=>new SolidColorBrush(Color(LightFields ? "#D3D5DA" : "#8044475A"));
     private bool navigationHidden,channelsHidden,expandedVideo;
     private Action? refreshLibrary,refreshGuide;
     private static void QuietItems(ListViewBase list)
@@ -51,11 +55,11 @@ public sealed partial class MainWindow
     private string BorderHex=>settings.Appearance.Theme=="Light" ? "#D3D5DA" : "#44475A";
     private static SolidColorBrush FieldText()=>new(Color(LightFields ? "#202228" : "#F8F8F2"));
     private static SolidColorBrush FieldFill()=>new(Color(LightFields ? "#FFFFFF" : "#21222C"));
-    private static SolidColorBrush FieldStroke()=>new(Color(LightFields ? "#D3D5DA" : "#44475A"));
+    private static SolidColorBrush FieldStroke()=>new(Color(LightFields ? "#D3D5DA" : "#8044475A"));
     private static void PolishField(Control control,bool preserveTemplate=false)
     {
         if(!preserveTemplate) control.Style=(Style)Application.Current.Resources[control is ComboBox ? "NullTVComboBoxStyle" : control is PasswordBox ? "NullTVPasswordBoxStyle" : "NullTVTextBoxStyle"];
-        control.CornerRadius=new CornerRadius(8); control.FontSize=13; control.Padding=new Thickness(12,9,12,9); control.Background=FieldFill(); control.Foreground=FieldText(); control.BorderBrush=FieldStroke(); control.BorderThickness=new Thickness(.5);
+        control.CornerRadius=new CornerRadius(10); control.FontSize=13; control.Padding=new Thickness(12,9,12,9); control.Background=FieldFill(); control.Foreground=FieldText(); control.BorderBrush=FieldStroke(); control.BorderThickness=new Thickness(1);
         control.Resources["TextControlForeground"]=FieldText(); control.Resources["TextControlForegroundFocused"]=FieldText(); control.Resources["TextControlForegroundPointerOver"]=FieldText(); control.Resources["TextControlBackgroundFocused"]=FieldFill(); control.Resources["TextControlBorderBrushFocused"]=new SolidColorBrush(Color("#815CD6"));
         if(control is ComboBox combo)
         {

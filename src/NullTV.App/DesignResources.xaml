@@ -10,9 +10,9 @@
 <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#21222C"/><SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="#BD93F9"/><SolidColorBrush x:Key="ComboBoxDropDownForeground" Color="#F8F8F2"/><SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#44475A"/>
 <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedUnfocused" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushPointerOver" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelected" Color="Transparent"/><SolidColorBrush x:Key="ComboBoxItemBorderBrushSelectedPointerOver" Color="Transparent"/>
 
-<SolidColorBrush x:Key="NullTVFieldBackground" Color="#21222C"/><SolidColorBrush x:Key="NullTVFieldBorder" Color="#44475A"/><SolidColorBrush x:Key="NullTVFieldText" Color="#F8F8F2"/><SolidColorBrush x:Key="NullTVFieldHint" Color="#BD93F9"/><SolidColorBrush x:Key="NullTVFieldFocus" Color="#815CD6"/>
+<SolidColorBrush x:Key="NullTVFieldBackground" Color="#21222C"/><SolidColorBrush x:Key="NullTVFieldBorder" Color="#8044475A"/><SolidColorBrush x:Key="NullTVFieldText" Color="#F8F8F2"/><SolidColorBrush x:Key="NullTVFieldHint" Color="#B3F8F8F2"/><SolidColorBrush x:Key="NullTVFieldFocus" Color="#815CD6"/>
 <SolidColorBrush x:Key="NullTVButtonBackground" Color="#343746"/><SolidColorBrush x:Key="NullTVButtonText" Color="#F8F8F2"/>
-<SolidColorBrush x:Key="TextControlForeground" Color="#F8F8F2"/><SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F8F8F2"/><SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F8F8F2"/><SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#BD93F9"/><SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#BD93F9"/>
+<SolidColorBrush x:Key="TextControlForeground" Color="#F8F8F2"/><SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F8F8F2"/><SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F8F8F2"/><SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#B3F8F8F2"/><SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#B3F8F8F2"/>
 <SolidColorBrush x:Key="TextControlBackground" Color="#21222C"/><SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#282A36"/><SolidColorBrush x:Key="TextControlBorderBrush" Color="#44475A"/><SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#815CD6"/>
 <SolidColorBrush x:Key="ComboBoxBackground" Color="#21222C"/><SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#282A36"/><SolidColorBrush x:Key="ComboBoxForeground" Color="#F8F8F2"/><SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#44475A"/>
 </ResourceDictionary>
@@ -24,20 +24,26 @@
 <SolidColorBrush x:Key="NullTVButtonBackground" Color="#E8EAEE"/><SolidColorBrush x:Key="NullTVButtonText" Color="#202228"/>
 </ResourceDictionary>
 </ResourceDictionary.ThemeDictionaries>
+<FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text</FontFamily><FontFamily x:Key="TextControlThemeFontFamily">Segoe UI Variable Text</FontFamily>
 <CornerRadius x:Key="ControlCornerRadius">10</CornerRadius>
 <ControlTemplate x:Key="NullTVPlaybackThumbTemplate" TargetType="Thumb">
-<Grid Background="Transparent"><Border Width="2" Height="8" CornerRadius="1" Background="{TemplateBinding Background}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+<Grid Background="Transparent"><Border Width="3" Height="10" CornerRadius="1.5" Background="{TemplateBinding Background}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
 </ControlTemplate>
+<ControlTemplate x:Key="NullTVProgressTemplate" TargetType="ProgressBar"><Grid x:Name="RailRoot" Background="Transparent"/></ControlTemplate>
 <ControlTemplate x:Key="NullTVButtonTemplate" TargetType="Button">
-<Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+<Grid>
 <VisualStateManager.VisualStateGroups><VisualStateGroup x:Name="CommonStates">
-<VisualState x:Name="Normal"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="1"/></VisualState.Setters></VisualState>
-<VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.82"/></VisualState.Setters></VisualState>
-<VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.6"/></VisualState.Setters></VisualState>
-<VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.35"/></VisualState.Setters></VisualState>
+<VisualStateGroup.Transitions><VisualTransition GeneratedDuration="0:0:0.12"/></VisualStateGroup.Transitions>
+<VisualState x:Name="Normal"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="1"/><Setter Target="HoverWash.Opacity" Value="0"/></VisualState.Setters></VisualState>
+<VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="1"/><Setter Target="HoverWash.Opacity" Value="0.045"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.9"/><Setter Target="HoverWash.Opacity" Value="0.08"/></VisualState.Setters></VisualState>
+<VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Chrome.Opacity" Value="0.35"/><Setter Target="HoverWash.Opacity" Value="0"/></VisualState.Setters></VisualState>
 </VisualStateGroup></VisualStateManager.VisualStateGroups>
+<Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
 <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" ContentTransitions="{TemplateBinding ContentTransitions}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" Foreground="{TemplateBinding Foreground}"/>
 </Border>
+<Border x:Name="HoverWash" Background="#F8F8F2" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" IsHitTestVisible="False"/>
+</Grid>
 </ControlTemplate>
 <Style x:Key="NullTVButtonStyle" TargetType="Button">
 <Setter Property="Template" Value="{StaticResource NullTVButtonTemplate}"/><Setter Property="Background" Value="{ThemeResource NullTVButtonBackground}"/><Setter Property="Foreground" Value="{ThemeResource NullTVButtonText}"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="10"/><Setter Property="MinHeight" Value="44"/><Setter Property="Padding" Value="16,10"/><Setter Property="FontSize" Value="14"/>

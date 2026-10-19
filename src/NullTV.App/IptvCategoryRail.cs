@@ -21,7 +21,7 @@ public sealed partial class MainWindow
         public IptvCategoryRail(MainWindow app,ChannelSelection selection,bool collapsed,Action<ChannelSelection> selected,Action<bool> resized)
         {
             this.app=app; this.selection=selection; this.selected=selected; this.resized=resized; Collapsed=collapsed;
-            Background=new SolidColorBrush(Color("#21222C")); BorderBrush=new SolidColorBrush(Color("#44475A")); BorderThickness=new Thickness(0,0,.5,0);
+            Background=new SolidColorBrush(Color("#21222C")); BorderBrush=SoftStroke(); BorderThickness=new Thickness(0,0,.5,0);
             RowDefinitions.Add(new() { Height=new(40) }); RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
             toggle=app.IconButton("\uE76B","Collapse IPTV categories",Toggle); toggle.MinHeight=toggle.Height=30; toggle.Width=32; toggle.HorizontalAlignment=HorizontalAlignment.Right; toggle.Margin=new Thickness(8,4,8,4); Place(this,toggle);
             QuietItems(list); list.Margin=new Thickness(6,0,6,0);
@@ -30,7 +30,7 @@ public sealed partial class MainWindow
             list.ContainerContentChanging+=(_,args)=> {
                 if(args.InRecycleQueue || args.Item is not RailEntry entry || args.ItemContainer.ContentTemplateRoot is not Grid host) return;
                 host.Children.Clear(); var active=entry.Selection?.Key==this.selection.Key;
-                var content=new Grid { ColumnSpacing=10,Padding=new Thickness(10,0,10,0),CornerRadius=new CornerRadius(8),Background=new SolidColorBrush(Color(active ? "#BD93F9" : "#21222C")) };
+                var content=new Grid { ColumnSpacing=10,Padding=new Thickness(10,0,10,0),CornerRadius=new CornerRadius(10),Margin=new Thickness(0,2,0,2),Background=new SolidColorBrush(Color(active ? "#BD93F9" : "#21222C")) };
                 content.ColumnDefinitions.Add(new() { Width=new(20) }); content.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); content.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
                 var ink=new SolidColorBrush(Color(active ? "#282A36" : "#F8F8F2"));
                 Place(content,new FontIcon { Glyph=entry.Glyph,FontSize=entry.Selection==null ? 11 : 18,Foreground=ink,Opacity=active ? 1 : .78 });

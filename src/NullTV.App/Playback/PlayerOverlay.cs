@@ -137,7 +137,7 @@ public sealed class PlayerOverlay : IDisposable
     private RectInt32 videoBounds;
     private static void Round(DesktopWindowXamlSource source,RectInt32 bounds,double scale)
     {
-        var radius=(int)Math.Round(16*scale); var region=CreateRoundRectRgn(0,0,bounds.Width+1,bounds.Height+1,radius,radius);
+        var radius=(int)Math.Round(24*scale); var region=CreateRoundRectRgn(0,0,bounds.Width+1,bounds.Height+1,radius,radius);
         if(region!=IntPtr.Zero && SetWindowRgn(Win32Interop.GetWindowFromWindowId(source.SiteBridge.WindowId),region,true)==0) DeleteObject(region);
     }
     private static void Fade(DesktopWindowXamlSource source)

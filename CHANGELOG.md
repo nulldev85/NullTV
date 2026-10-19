@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-10-19
+
+- Rounded green progress rails replace rigid hairline tracks. Playback and volume markers appear during interaction, with no permanent ball or needle.
+- Softer Dracula surfaces, lighter outlines, refined typography and consistent rounded fields, cards and poster frames throughout the app.
+- Navigation is quieter and button hover feedback fades within the full control shape while keeping labels readable.
+- Guide retains precise now-line alignment, with softly rounded progress, subtler live-program borders and a clock that advances each second.
 ## 0.6.1 — 2026-10-18
 
 - Centered the current-time label directly above the pink now line.

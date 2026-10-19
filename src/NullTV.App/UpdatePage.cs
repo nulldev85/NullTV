@@ -92,7 +92,7 @@ public sealed partial class MainWindow
         Place(versions,current); var arrow=Text("→",22); arrow.Opacity=.45; arrow.VerticalAlignment=VerticalAlignment.Center; Place(versions,arrow,0,1); Place(versions,next,0,2);
         var releaseNotes=Text(update.Release.Notes,13); releaseNotes.LineHeight=21; var notes=Scroll(releaseNotes); notes.MaxHeight=180;
         var info=Text($"Stable release  ·  Windows ARM64  ·  {update.Release.Size/1048576d:0.0} MB",11); info.Opacity=.55;
-        var progress=new ProgressBar { Minimum=0,Maximum=100,Height=3,MinHeight=3,Foreground=new SolidColorBrush(Color("#50FA7B")),Background=new SolidColorBrush(Color("#44475A")),Visibility=Visibility.Collapsed };
+        var progress=PolishedProgressBar.Create(); progress.Visibility=Visibility.Collapsed;
         var state=Text("Download now. Restart when you're ready.",12); state.Opacity=.8;
         var versionsCard=Card(versions,new Thickness(16)); versionsCard.Background=new SolidColorBrush(Color("#21222C")); versionsCard.BorderBrush=new SolidColorBrush(Color("#44475A"));
         var content=Stack(label,title,description,versionsCard,info,notes,progress,state); content.Spacing=14; content.MinWidth=380;
