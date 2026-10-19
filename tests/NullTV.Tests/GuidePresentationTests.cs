@@ -46,5 +46,14 @@ internal static class GuidePresentationTests
             check(GuideGeometry.Segment(start.AddHours(-2),start.AddHours(-1),start)==null && GuideGeometry.Segment(start,start,start)==null,"Out-of-window or invalid program was rendered");
             return Task.CompletedTask;
         });
+        test("Live progress meets the now line even when the program starts before the window",()=> {
+            var window=new DateTimeOffset(2026,10,18,21,30,0,TimeSpan.FromHours(-7)); var now=window.AddMinutes(67.5);
+            foreach(var start in new[]{window.AddMinutes(30),window.AddMinutes(-30)}) {
+                var segment=GuideGeometry.Segment(start,window.AddMinutes(90),window)!.Value;
+                var left=segment.Left+2; var width=segment.Width-4;
+                check(Math.Abs(left+GuideGeometry.ElapsedWidth(now,window,left,width)-GuideGeometry.Position(now,window))<.001,"Progress endpoint drifted from the shared clock coordinate");
+            }
+            return Task.CompletedTask;
+        });
     }
 }

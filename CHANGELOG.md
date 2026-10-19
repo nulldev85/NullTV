@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — 2026-10-18
+
+- Centered the current-time label directly above the pink now line.
+- Aligned green live-program progress with the now line, including programs that begin before the visible schedule window.
+
 ## 0.6.0 — 2026-10-18
 
 - Dracula styling now includes pill navigation across the top, refined channel cards, shared quality badges and clearer Settings panels.

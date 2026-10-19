@@ -121,18 +121,18 @@ public sealed partial class MainWindow
         headerScroll.SizeChanged+=(_,_)=> { scroll.Maximum=Math.Max(0,timelineWidth-headerScroll.ActualWidth); scroll.ViewportSize=headerScroll.ActualWidth; SetOffset(offset); };
         list.AddHandler(UIElement.PointerWheelChangedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,e)=> { var properties=e.GetCurrentPoint(list).Properties; if(properties.IsHorizontalMouseWheel) { SetOffset(offset+properties.MouseWheelDelta); e.Handled=true; } }),true);
         var tick=new DispatcherTimer { Interval=TimeSpan.FromSeconds(15) };
-        Border? headerNow=null;
+        Border? headerNow=null; var clockNow=DateTimeOffset.Now;
         void BuildHours()
         {
             hours.Children.Clear(); date.Text=guideStart.LocalDateTime.ToString("ddd, dd MMM");
             for(int n=0;n<6;n++) { var line=new Border { Width=1,Height=34,Background=new SolidColorBrush(Color("#44475A")) }; Canvas.SetLeft(line,n*240); hours.Children.Add(line); var time=Text(guideStart.AddHours(n).LocalDateTime.ToString("HH:mm"),12); time.Opacity=.75; Canvas.SetLeft(time,n*240+10); Canvas.SetTop(time,9); hours.Children.Add(time); }
             headerNow=new Border { Background=new SolidColorBrush(Color("#FF79C6")),Padding=new Thickness(5,1,5,1),CornerRadius=new CornerRadius(4),Child=new TextBlock { Text=DateTimeOffset.Now.ToString("HH:mm"),FontSize=10,Foreground=new SolidColorBrush(Color("#282A36")) } }; hours.Children.Add(headerNow);
-            UpdateClock();
+            clockNow=DateTimeOffset.Now; UpdateClock();
         }
         void UpdateClock()
         {
-            var x=(DateTimeOffset.Now-guideStart).TotalMinutes*GuideGeometry.PixelsPerMinute;
-            if(headerNow!=null) { headerNow.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; Canvas.SetLeft(headerNow,Math.Clamp(x-18,0,timelineWidth-42)); Canvas.SetTop(headerNow,7); ((TextBlock)headerNow.Child).Text=DateTimeOffset.Now.ToString("HH:mm"); }
+            var x=GuideGeometry.Position(clockNow,guideStart);
+            if(headerNow!=null) { headerNow.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; ((TextBlock)headerNow.Child).Text=clockNow.ToString("HH:mm"); headerNow.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity)); Canvas.SetLeft(headerNow,x-headerNow.DesiredSize.Width/2); Canvas.SetTop(headerNow,7); }
         }
         GuideReorder reorder=null!;
         async Task PersistOrderAsync() { if(!unloaded && ReferenceEquals(profile,settings.Profile) && guideSelection.Scope==ChannelScope.Favorites) { FavoriteGuide.SaveOrder(profile,items,rows.Select(row=>row.Channel.Id)); await store.SaveAsync(settings); } }
@@ -167,16 +167,19 @@ public sealed partial class MainWindow
                 var programTitle=Text(show.Title,13); programTitle.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; programTitle.TextWrapping=TextWrapping.NoWrap; programTitle.TextTrimming=TextTrimming.CharacterEllipsis;
                 var time=Text(show.TimeLabel,11); time.Opacity=.68; time.TextWrapping=TextWrapping.NoWrap; time.TextTrimming=TextTrimming.CharacterEllipsis;
                 var flag=Text(show.IsPremiere ? "PREMIERE" : show.IsNew ? "NEW" : "",9); flag.Foreground=new SolidColorBrush(Color("#F1FA8C")); flag.Visibility=flag.Text=="" ? Visibility.Collapsed : Visibility.Visible;
-                var progress=new ProgressBar { Height=2,MinHeight=2,Maximum=100,Foreground=new SolidColorBrush(Color("#50FA7B")),Background=new SolidColorBrush(Color("#44475A")),VerticalAlignment=VerticalAlignment.Bottom };
-                var copyStack=Stack(programTitle,time,flag); copyStack.Spacing=4; var content=new Grid(); content.Children.Add(copyStack); content.Children.Add(progress);
+                var fill=new Border { Width=0,Height=2,CornerRadius=new CornerRadius(1),Background=new SolidColorBrush(Color("#50FA7B")),HorizontalAlignment=HorizontalAlignment.Left };
+                var trackLeft=segment.Left+2; var trackWidth=Math.Max(0,segment.Width-4);
+                var progress=new Border { Width=trackWidth,Height=2,CornerRadius=new CornerRadius(1),Background=new SolidColorBrush(Color("#44475A")),Child=fill,IsHitTestVisible=false };
+                var copyStack=Stack(programTitle,time,flag); copyStack.Spacing=4; var content=new Grid(); content.Children.Add(copyStack);
                 var cell=Button("",()=> { SelectProgram(row.Channel,show); if(show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now) _=GuardAsync(()=>PlayAsync(row.Channel)); foreach(var update in updates.Values) update(); }); cell.Content=content; cell.MinWidth=cell.MinHeight=0; cell.Height=80; cell.Width=Math.Max(1,segment.Width-4); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(6); cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.VerticalContentAlignment=VerticalAlignment.Stretch;
                 ToolTipService.SetToolTip(cell,show.Title+" · "+show.TimeLabel); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(cell,row.Channel.Name+", "+show.Title+", "+show.TimeLabel);
                 cell.RightTapped+=(_,e)=> { _=GuardAsync(()=>ProgrammeDetailsAsync(row.Channel,show)); e.Handled=true; };
                 Canvas.SetLeft(cell,segment.Left+2); Canvas.SetTop(cell,4); canvas.Children.Add(cell);
-                cellUpdates.Add(()=> { var live=show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start; cell.Background=new SolidColorBrush(Color(live ? "#403A52" : "#282A36")); cell.BorderBrush=new SolidColorBrush(Color(live || selected ? "#BD93F9" : "#282A36")); cell.BorderThickness=new Thickness(live || selected ? 1 : 0); progress.Visibility=live ? Visibility.Visible : Visibility.Collapsed; progress.Value=Math.Clamp((DateTimeOffset.Now-show.Start).TotalSeconds/(show.End-show.Start).TotalSeconds*100,0,100); });
+                Canvas.SetLeft(progress,trackLeft); Canvas.SetTop(progress,73); canvas.Children.Add(progress);
+                cellUpdates.Add(()=> { var live=show.Start<=clockNow && show.End>clockNow; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start; cell.Background=new SolidColorBrush(Color(live ? "#403A52" : "#282A36")); cell.BorderBrush=new SolidColorBrush(Color(live || selected ? "#BD93F9" : "#282A36")); cell.BorderThickness=new Thickness(live || selected ? 1 : 0); progress.Visibility=live ? Visibility.Visible : Visibility.Collapsed; fill.Width=GuideGeometry.ElapsedWidth(clockNow,row.Start,trackLeft,trackWidth); });
             }
             var marker=new Border { Width=1.5,Height=rowHeight,Background=new SolidColorBrush(Color("#FF79C6")),IsHitTestVisible=false }; canvas.Children.Add(marker);
-            updates[grid]=()=> { foreach(var update in cellUpdates) update(); var now=DateTimeOffset.Now; current.Text=row.Shows.FirstOrDefault(show=>show.Start<=now && show.End>now)?.Title??"No program data"; var x=(now-row.Start).TotalMinutes*GuideGeometry.PixelsPerMinute; marker.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; Canvas.SetLeft(marker,x); };
+            updates[grid]=()=> { foreach(var update in cellUpdates) update(); current.Text=row.Shows.FirstOrDefault(show=>show.Start<=clockNow && show.End>clockNow)?.Title??"No program data"; var x=GuideGeometry.Position(clockNow,row.Start); marker.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; Canvas.SetLeft(marker,x-marker.Width/2); };
             updates[grid]();
         }
         list.ContainerContentChanging+=(sender,args)=> { if(args.InRecycleQueue) { BuildRow(sender,args); return; } if(args.Phase==0) { args.RegisterUpdateCallback(1,BuildRow); return; } BuildRow(sender,args); };
@@ -199,7 +202,7 @@ public sealed partial class MainWindow
             catch(OperationCanceledException) { }
         }
         refreshGuideQuality=()=> { foreach(var update in qualityUpdates.Values) update(); };
-        tick.Tick+=(_,_)=> { if(currentTab!="Guide" || reorder.IsDragging) return; UpdateInfo(); UpdateClock(); foreach(var update in updates.Values) update(); };
+        tick.Tick+=(_,_)=> { if(currentTab!="Guide" || reorder.IsDragging) return; clockNow=DateTimeOffset.Now; UpdateInfo(); UpdateClock(); foreach(var update in updates.Values) update(); };
         list.Loaded+=(_,_)=> { if(list.ItemsPanelRoot is ItemsStackPanel panel) panel.ItemsUpdatingScrollMode=ItemsUpdatingScrollMode.KeepScrollOffset; tick.Start(); }; list.Unloaded+=(_,_)=> { unloaded=true; pending?.Cancel(); tick.Stop(); reorder.Dispose(); timelines.Clear(); updates.Clear(); qualityUpdates.Clear(); refreshGuideQuality=null; };
         guideVideoExpanded=Card(new Grid(),new Thickness(0)); guideVideoExpanded.CornerRadius=new CornerRadius(0); guideVideoExpanded.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(guideVideoExpanded,2); Place(page,guideVideoExpanded);
         page.Loaded+=(_,_)=>UpdateGuideVideoLayout(); var select=selectGuideChannel; selectGuideChannel=channel=> { select?.Invoke(channel); foreach(var update in updates.Values) update(); };
