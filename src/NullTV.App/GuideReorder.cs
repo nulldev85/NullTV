@@ -24,8 +24,9 @@ public sealed partial class MainWindow
             foreach(var old in visuals.Where(pair=>ReferenceEquals(pair.Value,visual)).Select(pair=>pair.Key).ToArray()) visuals.Remove(old);
             visuals[row]=visual;
             var thumb=new Thumb { Width=24,MinHeight=48,VerticalAlignment=VerticalAlignment.Stretch,
-                Template=(ControlTemplate)XamlReader.Load("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Grid Background='Transparent'><FontIcon Glyph='&#xE784;' FontSize='16' Foreground='#BD93F9' Opacity='.75'/></Grid></ControlTemplate>") };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(thumb,"Drag "+row.Channel.Name+" to reorder"); ToolTipService.SetToolTip(thumb,"Drag to reorder");
+                Template=(ControlTemplate)XamlReader.Load("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Grid Background='Transparent'><TextBlock Text='⠿' FontFamily='Segoe UI Symbol' FontSize='18' Foreground='#6272A4' HorizontalAlignment='Center' VerticalAlignment='Center'/></Grid></ControlTemplate>") };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(thumb,"Reorder "+row.Channel.Name); ToolTipService.SetToolTip(thumb,"Drag, or focus and use Up/Down to reorder");
+            thumb.KeyDown+=(_,args)=> { if(args.Key is not (Windows.System.VirtualKey.Up or Windows.System.VirtualKey.Down)) return; var from=rows.IndexOf(row); var to=from+(args.Key==Windows.System.VirtualKey.Up ? -1 : 1); if(from>=0 && to>=0 && to<rows.Count) { rows.Move(from,to); completed(true); } args.Handled=true; };
             thumb.DragStarted+=(sender,args)=>
             {
                 dragged=row; origin=target=rows.IndexOf(row); distance=0; rowHeight=Math.Max(1,visual.ActualHeight+visual.Margin.Top+visual.Margin.Bottom);
@@ -38,7 +39,14 @@ public sealed partial class MainWindow
             {
                 scrollTimer.Stop(); var changed=!args.Canceled && origin>=0 && target>=0 && origin!=target;
                 ClearIndicators(); visual.Opacity=1; dragged=null;
-                if(changed) rows.Move(origin,target);
+                if(changed)
+                {
+                    var firstVisible=Math.Clamp((int)(initialScroll/rowHeight),0,rows.Count-1);
+                    rows.Move(origin,target);
+                    // ListView otherwise anchors the moved item at the top,
+                    // hiding the channel that has just moved above it.
+                    list.DispatcherQueue.TryEnqueue(()=> { list.UpdateLayout(); list.ScrollIntoView(rows[firstVisible],ScrollIntoViewAlignment.Leading); });
+                }
                 completed(changed);
             };
             return thumb;
@@ -56,7 +64,7 @@ public sealed partial class MainWindow
             ClearIndicators();
             if(target!=origin && visuals.TryGetValue(rows[target],out var destination)) { destination.BorderBrush=new SolidColorBrush(Color("#BD93F9")); destination.BorderThickness=target>origin ? new Thickness(0,0,0,2) : new Thickness(0,2,0,0); }
         }
-        private void ClearIndicators() { foreach(var visual in visuals.Values) visual.BorderThickness=new Thickness(0); }
+        private void ClearIndicators() { foreach(var visual in visuals.Values) visual.BorderThickness=new Thickness(0,0,0,.5); }
         private static ScrollViewer? FindScroll(DependencyObject node)
         {
             if(node is ScrollViewer scroll) return scroll;

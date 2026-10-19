@@ -7,11 +7,13 @@ public sealed partial class MainWindow
     private sealed class ChannelRow(MediaItem item) : ArtworkRow(item)
     {
         public string DisplayName=>$"{Item.Number:000}  {Item.Name}";
+        private string quality="";
+        public string Quality { get=>quality; set { if(quality==value) return; quality=value; Changed(nameof(Quality)); } }
         private string nowNext="No program information";
         public string NowNext { get=>nowNext; set { if(nowNext==value) return; nowNext=value; Changed(nameof(NowNext)); } }
         private bool favorite;
         public bool IsFavorite { get=>favorite; set { if(favorite==value) return; favorite=value; Changed(nameof(FavoriteGlyph)); Changed(nameof(FavoriteLabel)); Changed(nameof(FavoriteBrush)); } }
-        public Microsoft.UI.Xaml.Media.Brush FavoriteBrush=>new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? LightFields ? "#A39514" : "#F1FA8C" : LightFields ? "#202228" : "#F8F8F2"));
+        public Microsoft.UI.Xaml.Media.Brush FavoriteBrush=>new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? "#FF79C6" : "#6272A4"));
         public string FavoriteGlyph=>favorite ? "\uE735" : "\uE734";
         public string FavoriteLabel=>$"{(favorite ? "Remove" : "Add")} {Item.Name} {(favorite ? "from" : "to")} favorites";
     }
@@ -77,7 +79,7 @@ public sealed partial class MainWindow
             finally { updatingTransport=false; }
             if(elapsedLabel!=null) elapsedLabel.Text=TimeCode(state.Position); if(durationLabel!=null) durationLabel.Text=TimeCode(state.Duration);
         }
-        if(playerOverlay?.IsVisible==true && infoTask?.IsCompleted!=false && DateTimeOffset.UtcNow-infoUpdated>TimeSpan.FromSeconds(2)) infoTask=GuardAsync(UpdateStreamInfoAsync);
+        if(running && infoTask?.IsCompleted!=false && DateTimeOffset.UtcNow-infoUpdated>TimeSpan.FromSeconds(playerOverlay?.IsVisible==true ? 2 : 30)) infoTask=GuardAsync(UpdateStreamInfoAsync);
     }
     private void SeekRelative(int seconds)
     {
@@ -93,8 +95,23 @@ public sealed partial class MainWindow
     private async Task UpdateStreamInfoAsync()
     {
         infoUpdated=DateTimeOffset.UtcNow; var player=surface?.Player; var itemId=playing?.Id; var generation=surface==null ? 0 : generations.GetValueOrDefault(surface); if(player==null) return;
-        var details=await Task.Run(player.StreamDetails);
-        if(!closed && ReferenceEquals(surface?.Player,player) && playing?.Id==itemId && surface!=null && generations.GetValueOrDefault(surface)==generation && streamInfo!=null) streamInfo.Text=details;
+        var item=playing;
+        var snapshot=await Task.Run(()=> (Details:player.StreamDetails(),Quality:item==null ? null : player.ObserveQuality(item.Url)));
+        if(!closed && ReferenceEquals(surface?.Player,player) && playing?.Id==itemId && surface!=null && generations.GetValueOrDefault(surface)==generation)
+        {
+            if(streamInfo!=null) streamInfo.Text=snapshot.Details;
+            if(item!=null && snapshot.Quality is { IsValid:true } quality)
+            {
+                var previous=settings.Profile.StreamObservations.GetValueOrDefault(item.Id);
+                if(previous==null || previous.Width!=quality.Width || previous.Height!=quality.Height || Math.Abs(previous.FrameRate-quality.FrameRate)>.05 || previous.Transfer!=quality.Transfer || previous.UrlHash!=quality.UrlHash || quality.MeasuredUtc-previous.MeasuredUtc>TimeSpan.FromDays(1))
+                {
+                    settings.Profile.StreamObservations[item.Id]=quality;
+                    if(settings.Profile.StreamObservations.Count>2048) foreach(var key in settings.Profile.StreamObservations.OrderBy(pair=>pair.Value.MeasuredUtc).Take(settings.Profile.StreamObservations.Count-2048).Select(pair=>pair.Key).ToArray()) settings.Profile.StreamObservations.Remove(key);
+                    foreach(var row in liveRows.Where(row=>row.Item.Id==item.Id)) { row.Quality=QualityText(item); if(channelList?.ContainerFromItem(row) is ListViewItem container && FindNamedPanel(container.ContentTemplateRoot,"ChannelQualityBadges") is { } panel) FillQuality(panel,item); }
+                    refreshGuideQuality?.Invoke(); await store.SaveAsync(settings);
+                }
+            }
+        }
     }
     private async Task SubtitlesMenuAsync()
     {
@@ -123,12 +140,15 @@ public sealed partial class MainWindow
         UpdatePlaybackControls(); if(filter=="Favorites") await FilterLiveAsync();
         status.Text=favorites.Contains(item.Id) ? "Added to favorites." : "Removed from favorites.";
         await store.SaveAsync(settings);
+        liveCategoryRail?.Refresh();
         if(currentTab=="Guide") refreshGuide?.Invoke();
     }
     private void PrepareChannelFavorite(ListViewBase sender,ContainerContentChangingEventArgs args)
     {
         if(args.InRecycleQueue) return;
         if(args.Phase==0) { args.RegisterUpdateCallback(1,PrepareChannelFavorite); return; }
+        if(args.Item is ChannelRow row) row.Quality=QualityText(row.Item);
+        if(args.Item is ChannelRow qualityRow && FindNamedPanel(args.ItemContainer.ContentTemplateRoot,"ChannelQualityBadges") is { } panel) FillQuality(panel,qualityRow.Item);
         if(FindNamedButton(args.ItemContainer.ContentTemplateRoot,"FavoriteChannelButton") is { } button) { button.Style=(Style)Application.Current.Resources["NullTVButtonStyle"]; button.Click-=OnFavoriteClick; button.Click+=OnFavoriteClick; }
     }
     private void OnFavoriteClick(object sender,RoutedEventArgs e) { if(sender is Button { DataContext:ChannelRow row }) _=GuardAsync(()=>ToggleFavoriteAsync(row.Item)); }
@@ -136,6 +156,12 @@ public sealed partial class MainWindow
     {
         if(element is Button button && button.Name==name) return button; if(element==null) return null;
         for(int i=0;i<Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(element);i++) { var found=FindNamedButton(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(element,i),name); if(found!=null) return found; } return null;
+    }
+    private static StackPanel? FindNamedPanel(DependencyObject? element,string name)
+    {
+        if(element is StackPanel panel && panel.Name==name) return panel; if(element==null) return null;
+        for(int i=0;i<Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(element);i++) if(FindNamedPanel(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(element,i),name) is { } found) return found;
+        return null;
     }
     private void UpdateEmptyPlayer()
     {

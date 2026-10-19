@@ -20,17 +20,17 @@ public sealed partial class MainWindow
         foreach(var button in new[]{exitPlayerView,closePlayerView}) { button.MinHeight=32; button.Padding=new Thickness(10,5,10,5); button.FontSize=12; }
         ToolTipService.SetToolTip(exitPlayerView,"Return to the normal app view (Esc also exits the current viewing mode)");
         Place(playerModeBar,exitPlayerView); Place(playerModeBar,closePlayerView,0,1);
-        Grid.SetColumnSpan(playerModeBar,2); Place(root,playerModeBar,1);
+        Grid.SetColumnSpan(playerModeBar,2); Place(root,playerModeBar,2);
     }
     private void UpdatePlayerChrome()
     {
         var expanded=fullscreen || expandedVideo;
         LabelButton(navigationToggle,"\uE700",expanded || navigationHidden ? "Show navigation" : "Hide navigation");
-        root.RowDefinitions[0].Height=new(fullscreen ? 0 : 58);
-        root.ColumnDefinitions[0].Width=new(expanded || navigationHidden ? 0 : 184);
+        root.RowDefinitions[0].Height=new(fullscreen ? 0 : 36);
+        root.ColumnDefinitions[0].Width=new(0);
         if(sidebar!=null) sidebar.Visibility=expanded || navigationHidden ? Visibility.Collapsed : Visibility.Visible;
         status.Visibility=expanded || currentTab=="Guide" ? Visibility.Collapsed : Visibility.Visible;
-        pageHost.Margin=expanded ? new Thickness(0) : currentTab=="Guide" ? GuideMargin : new Thickness(28,18,28,20);
+        pageHost.Margin=expanded || currentTab=="Live TV" ? new Thickness(0) : currentTab=="Guide" ? GuideMargin : new Thickness(24,20,24,20);
         if(playerModeBar!=null) playerModeBar.Visibility=expandedVideo && !fullscreen ? Visibility.Visible : Visibility.Collapsed;
         if(titlebarChrome!=null) titlebarChrome.Visibility=fullscreen ? Visibility.Collapsed : Visibility.Visible;
         if(exitPlayerView!=null) exitPlayerView.Content=currentTab=="Guide" ? "‹  Back to guide" : "‹  Back to player";

@@ -1,22 +1,31 @@
 using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
 using NullTV.Core;
+using Windows.Foundation;
 namespace NullTV.App;
 public sealed partial class MainWindow
 {
-    private Grid? guidePage;
+    private Grid? guidePage,guideContent;
     private Border? guidePreview,guideVideoExpanded;
-    private Border? guideEmpty;
-    private bool guideHasRows;
-    private bool guideChannelsHidden;
-    private int guideSlots=4;
+    private bool guideRailCollapsed;
+    private ChannelSelection guideSelection=new(ChannelScope.Favorites);
+    private IptvCategoryRail? guideCategoryRail;
     private Action? updateGuidePanes;
-    private Thickness GuideMargin=>new(0,8,0,0);
     private Action<MediaItem>? selectGuideChannel;
+    private Thickness GuideMargin=>new(0);
+    private static DateTimeOffset HalfHour(DateTimeOffset time)=>new(time.Year,time.Month,time.Day,time.Hour,time.Minute/30*30,0,time.Offset);
+    private DateTimeOffset guideStart=HalfHour(DateTimeOffset.Now).AddHours(-1);
+    private sealed class GuideRow(MediaItem channel,Programme[] shows,DateTimeOffset start) : ArtworkRow(channel)
+    {
+        public MediaItem Channel=>Item;
+        public Programme[] Shows { get; }=shows;
+        public DateTimeOffset Start { get; }=start;
+    }
     private void MoveVideo(Border? destination)
     {
         if(videoGrid==null || destination==null || ReferenceEquals(videoGrid.Parent,destination)) return;
@@ -28,26 +37,11 @@ public sealed partial class MainWindow
     private void UpdateGuideVideoLayout()
     {
         if(currentTab!="Guide" || guidePage==null || guidePreview==null || guideVideoExpanded==null) return;
-        UpdatePlayerChrome();
-        var expanded=fullscreen || expandedVideo;
+        UpdatePlayerChrome(); var expanded=fullscreen || expandedVideo;
         MoveVideo(expanded ? guideVideoExpanded : guidePreview);
-        foreach(var child in guidePage.Children) child.Visibility=ReferenceEquals(child,guideVideoExpanded) ? expanded ? Visibility.Visible : Visibility.Collapsed : expanded || ReferenceEquals(child,guideEmpty) && guideHasRows ? Visibility.Collapsed : Visibility.Visible;
-        pageHost.Margin=expanded ? new Thickness(0) : GuideMargin;
-        if(sidebar!=null) sidebar.Visibility=expanded || navigationHidden ? Visibility.Collapsed : Visibility.Visible;
-        root.ColumnDefinitions[0].Width=new(expanded || navigationHidden ? 0 : 184);
-        updateGuidePanes?.Invoke();
-        UpdateEmptyPlayer(); UpdatePlaybackControls();
+        foreach(var child in guidePage.Children) child.Visibility=ReferenceEquals(child,guideVideoExpanded) ? expanded ? Visibility.Visible : Visibility.Collapsed : expanded ? Visibility.Collapsed : Visibility.Visible;
+        pageHost.Margin=new Thickness(0); updateGuidePanes?.Invoke(); UpdateEmptyPlayer(); UpdatePlaybackControls();
         DispatcherQueue.TryEnqueue(()=> { if(surface!=null) surface.Hide(!IsPlayerVisible || !active.ContainsKey(surface)); });
-    }
-    private static DateTimeOffset HalfHour(DateTimeOffset time)=>new(time.Year,time.Month,time.Day,time.Hour,time.Minute/30*30,0,time.Offset);
-    private DateTimeOffset guideStart=HalfHour(DateTimeOffset.Now);
-    private sealed class GuideRow(MediaItem channel,Programme[] shows,DateTimeOffset start,int minutes) : ArtworkRow(channel)
-    {
-        public MediaItem Channel=>Item;
-        public Programme[] Shows { get; }=shows;
-        public DateTimeOffset Start { get; }=start;
-        public int Minutes { get; }=minutes;
-        public override string ToString()=>Channel.Name;
     }
     private static string ProgrammeMeta(Programme show)=>string.Join(" · ",new[]{show.Category,show.Rating,show.Episode,show.IsPremiere ? "PREMIERE" : show.IsNew ? "NEW" : show.IsRepeat ? "REPEAT" : ""}.Where(value=>value!=""));
     private async Task AddReminderAsync(MediaItem channel,Programme show)
@@ -58,224 +52,158 @@ public sealed partial class MainWindow
     }
     private UIElement BuildGuide()
     {
-        var profile=settings.Profile;
-        var page=new Grid { RowSpacing=6 };
-        guidePage=page;
-        for(int n=0;n<3;n++) page.RowDefinitions.Add(new() { Height=GridLength.Auto });
-        page.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
-        var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6 };
-        var menuToggle=Button("",ToggleNavigation);
-        var channelsToggle=Button("",()=> { guideChannelsHidden=!guideChannelsHidden; UpdateGuideVideoLayout(); });
-        foreach(var button in new[]{menuToggle,channelsToggle}) { button.Padding=new Thickness(10,8,10,8); button.FontSize=12; actions.Children.Add(button); }
-        actions.Children.Add(AsyncButton("Refresh guide",()=>RefreshAllAsync(true)));
-        foreach(var button in actions.Children.OfType<Button>()) { button.MinHeight=button.Height=34; button.Padding=new Thickness(10,6,10,6); }
-        var heading=Heading("Guide","Your favorite channels. Your order.",actions); heading.Margin=new Thickness(12,0,12,2);
-        if(heading.Children[0] is StackPanel headingCopy && headingCopy.Children[1] is TextBlock caption) caption.SetBinding(TextBlock.TextProperty,new Binding { Source=status,Path=new PropertyPath(nameof(TextBlock.Text)) });
-        Place(page,heading);
+        const double channelWidth=276,rowHeight=88,timelineWidth=GuideGeometry.WindowMinutes*GuideGeometry.PixelsPerMinute;
+        var profile=settings.Profile; var page=new Grid(); guidePage=page;
+        page.ColumnDefinitions.Add(new() { Width=new(guideRailCollapsed ? 56 : 240) }); page.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        var main=new Grid { Background=new SolidColorBrush(Color("#21222C")) }; guideContent=main;
+        main.RowDefinitions.Add(new() { Height=GridLength.Auto }); main.RowDefinitions.Add(new() { Height=new(48) }); main.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); Place(page,main,0,1);
+        IptvCategoryRail? rail=null;
+        rail=new(this,guideSelection,guideRailCollapsed,selection=> { guideSelection=selection; refreshGuide?.Invoke(); },collapsed=> { guideRailCollapsed=collapsed; page.ColumnDefinitions[0].Width=new(collapsed ? 56 : 240); }); guideCategoryRail=rail; Place(page,rail);
+        updateGuidePanes=()=>page.ColumnDefinitions[0].Width=new(fullscreen || expandedVideo ? 0 : guideRailCollapsed ? 56 : 240);
         MediaItem? selectedChannel=null; Programme? selectedShow=null;
-        var info=new Grid { ColumnSpacing=20 }; info.ColumnDefinitions.Add(new() { Width=new(360) }); info.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-        guidePreview=Card(new Grid(),new Thickness(0)); guidePreview.CornerRadius=new CornerRadius(10);
-        var preview=guidePreview;
-        preview.SizeChanged+=(_,_)=> { var height=Math.Max(160,preview.ActualWidth*9/16); if(Math.Abs(preview.Height-height)>.5 || double.IsNaN(preview.Height)) preview.Height=height; };
-        Place(info,guidePreview);
-        var infoContext=Text("SELECT A PROGRAM",10); infoContext.CharacterSpacing=100;
-        var infoTitle=Text("What is on. What is next.",21); infoTitle.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; infoTitle.TextWrapping=TextWrapping.NoWrap; infoTitle.TextTrimming=TextTrimming.CharacterEllipsis;
-        var infoMeta=Text("",11); infoMeta.Foreground=new SolidColorBrush(Color(LightFields ? "#815CD6" : "#BD93F9"));
-        var infoDescription=Text("Browse schedules, read program details and watch your favorite channels.",12); infoDescription.Opacity=.7; infoDescription.TextTrimming=TextTrimming.CharacterEllipsis;
-        var copy=Stack(infoContext,infoTitle,infoMeta,infoDescription); copy.Spacing=7;
-        var infoDetails=new Grid(); Place(infoDetails,copy); Place(info,infoDetails,0,1);
-        // Keep the summary within the preview's height without a redundant action row.
-        preview.SizeChanged+=(_,_)=>infoDescription.MaxLines=Math.Max(2,(int)((preview.ActualHeight-92)/17));
-        var infoCard=Card(info,new Thickness(12,8,12,8)); infoCard.CornerRadius=new CornerRadius(8); infoCard.BorderThickness=new Thickness(.5); infoCard.Margin=new Thickness(8,0,8,0); Place(page,infoCard,1);
+        var info=new Grid { ColumnSpacing=18,Padding=new Thickness(16,12,16,12),BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,0,0,.5) };
+        info.ColumnDefinitions.Add(new() { Width=new(288) }); info.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        guidePreview=Card(new Grid(),new Thickness(0)); guidePreview.Height=162; guidePreview.CornerRadius=new CornerRadius(8); Place(info,guidePreview);
+        var context=Text("LIVE TV GUIDE",10); context.CharacterSpacing=100; context.Foreground=new SolidColorBrush(Color("#50FA7B")); context.TextWrapping=TextWrapping.NoWrap; context.TextTrimming=TextTrimming.CharacterEllipsis;
+        var title=Text("Choose a channel or live program",20); title.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; title.TextWrapping=TextWrapping.NoWrap; title.TextTrimming=TextTrimming.CharacterEllipsis;
+        var meta=Text("",11); meta.Foreground=new SolidColorBrush(Color("#BD93F9")); meta.TextWrapping=TextWrapping.NoWrap; meta.TextTrimming=TextTrimming.CharacterEllipsis;
+        var description=Text("Explore favorites and your provider's categories. Watch here while you browse the schedule.",12); description.Opacity=.75; description.MaxLines=4; description.TextTrimming=TextTrimming.CharacterEllipsis;
+        var copy=Stack(context,title,meta,description); copy.Spacing=6; copy.VerticalAlignment=VerticalAlignment.Center; Place(info,copy,0,1); Place(main,info);
         void UpdateInfo()
         {
-            if(selectedChannel==null || selectedShow==null) return;
-            var show=selectedShow; var onNow=show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now;
-            var state=onNow ? "ON NOW" : show.End<=DateTimeOffset.Now ? "ENDED" : "UPCOMING";
-            var minutes=(int)Math.Ceiling((show.End-show.Start).TotalMinutes);
-            infoContext.Text=$"{state}  ·  {selectedChannel.Number:000}  {selectedChannel.Name}  ·  {show.TimeLabel}  ·  {minutes} min"+(onNow ? $"  ·  {Math.Max(1,(int)Math.Ceiling((show.End-DateTimeOffset.Now).TotalMinutes))} min left" : "");
-            infoContext.Foreground=onNow ? new SolidColorBrush(Color(LightFields ? "#089108" : "#50FA7B")) : FieldText();
-            infoTitle.Text=show.Title+(show.Subtitle=="" ? "" : " — "+show.Subtitle);
-            infoMeta.Text=ProgrammeMeta(show); infoMeta.Visibility=infoMeta.Text=="" ? Visibility.Collapsed : Visibility.Visible;
-            infoDescription.Text=show.Description=="" ? "No description supplied by the provider." : show.Description;
+            if(selectedChannel==null) return;
+            var show=selectedShow; var now=DateTimeOffset.Now;
+            context.Text=selectedChannel.Name+ (show==null ? " · LIVE CHANNEL" : $" · {show.TimeLabel}"+(show.Start<=now && show.End>now ? $" · {Math.Ceiling((show.End-now).TotalMinutes)} min left" : ""));
+            title.Text=show==null ? selectedChannel.Name : show.Title+(show.Subtitle=="" ? "" : " — "+show.Subtitle);
+            meta.Text=show==null ? "" : ProgrammeMeta(show); meta.Visibility=meta.Text=="" ? Visibility.Collapsed : Visibility.Visible;
+            description.Text=show==null ? "No program data supplied for this channel. Select it to watch live." : show.Description=="" ? "No description supplied by the provider." : show.Description;
         }
-        void SelectProgramme(MediaItem channel,Programme show) { selectedChannel=channel; selectedShow=show; UpdateInfo(); }
+        void SelectProgram(MediaItem channel,Programme? show) { selectedChannel=channel; selectedShow=show; UpdateInfo(); }
         selectGuideChannel=channel=> {
-            selectedChannel=channel;
             var id=profile.Sources.FirstOrDefault(s=>s.Id==channel.SourceId)?.EpgMappings.GetValueOrDefault(channel.Id,channel.EpgId=="" ? channel.Id : channel.EpgId)??channel.EpgId;
-            selectedShow=GuideFor(channel.SourceId).NowNext(id,DateTimeOffset.Now).Now;
-            if(selectedShow!=null) UpdateInfo();
-            else { infoContext.Text=$"LIVE CHANNEL  ·  {channel.Number:000}  {channel.Name}"; infoTitle.Text=channel.Name; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Program information is unavailable. Live playback is still available here."; }
+            SelectProgram(channel,GuideFor(channel.SourceId).NowNext(id,DateTimeOffset.Now).Now);
         };
-        var search=SearchBox("Search favorites or programs"); search.Width=280; search.Compact();
-        var controls=new Grid { ColumnSpacing=16 }; controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); controls.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
-        var timeActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=6 };
-        timeActions.Children.Add(IconButton("\uE76B","Previous schedule window",()=> { guideStart=guideStart.AddMinutes(-guideSlots*30); refreshGuide?.Invoke(); }));
-        var now=Button("Now",()=> { guideStart=HalfHour(DateTimeOffset.Now); refreshGuide?.Invoke(); }); now.Foreground=new SolidColorBrush(Color(LightFields ? "#A39514" : "#F1FA8C")); timeActions.Children.Add(now);
-        timeActions.Children.Add(IconButton("\uE76C","Next schedule window",()=> { guideStart=guideStart.AddMinutes(guideSlots*30); refreshGuide?.Invoke(); })); Place(controls,timeActions);
-        foreach(var button in timeActions.Children.OfType<Button>()) { button.MinHeight=button.Height=32; button.MinWidth=0; button.Padding=new Thickness(10,4,10,4); if(button.Content is FontIcon) button.Width=32; }
-        var date=Text(guideStart.LocalDateTime.ToString("ddd, dd MMM  ·  HH:mm")+"  ·  Local time",11); date.VerticalAlignment=VerticalAlignment.Center; Place(controls,date,0,1); Place(controls,search,0,2);
-        var toolbar=Card(controls,new Thickness(8,2,8,2)); toolbar.BorderThickness=new Thickness(0); toolbar.CornerRadius=new CornerRadius(0); Place(page,toolbar,2);
-        var rows=new ObservableCollection<GuideRow>();
-        var list=new ListView { ItemsSource=rows,SelectionMode=ListViewSelectionMode.None,IsSwipeEnabled=true };
-        QuietItems(list); WatchArtwork(list,88);
-        list.ItemContainerStyle=new Style(typeof(ListViewItem)) { Setters={ new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch),new Setter(Control.PaddingProperty,new Thickness(0)) } };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list,"Favorite channel guide. Drag grips to reorder, or use channel options.");
-        list.ItemTemplate=(DataTemplate)XamlReader.Load("<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><Grid Height='84' Margin='0,3' Background='Transparent'/></DataTemplate>");
-        var body=new Grid { RowSpacing=4 }; body.RowDefinitions.Add(new() { Height=GridLength.Auto }); body.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
-        var header=new Grid { ColumnSpacing=12 }; header.ColumnDefinitions.Add(new() { Width=new(280) }); header.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-        var summary=Text("FAVORITE CHANNELS",10); summary.CharacterSpacing=100; summary.Foreground=new SolidColorBrush(Color(LightFields ? "#A39514" : "#F1FA8C")); Place(header,summary);
-        var hours=new Grid(); for(int n=0;n<4;n++) { hours.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); var time=Text(guideStart.AddMinutes(n*30).LocalDateTime.ToString("HH:mm"),11); time.Opacity=.7; Place(hours,time,0,n); } Place(header,hours,0,1);
-        Place(body,header); Place(body,list,1); var schedule=Card(body,new Thickness(4,6,4,0)); schedule.CornerRadius=new CornerRadius(0); schedule.BorderThickness=new Thickness(0,.5,0,0); Place(page,schedule,3);
-        var empty=Card(EmptyState("\uE735","Build your favorite guide.","Star channels in Live TV and they will appear here, ready to arrange.","Choose favorite channels",()=> { Navigate("Live TV"); return Task.CompletedTask; })); Place(page,empty,3);
-        guideEmpty=empty;
-        CancellationTokenSource? pending=null; bool refreshPending=false,unloaded=false;
-        var tick=new DispatcherTimer { Interval=TimeSpan.FromSeconds(30) };
-        var timeUpdates=new Dictionary<Grid,Action>();
-        var paneUpdates=new Dictionary<Grid,Action>();
-        void UpdatePanes()
+        var toolbar=new Grid { Padding=new Thickness(16,6,12,6),ColumnSpacing=10 };
+        toolbar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); for(int i=0;i<3;i++) toolbar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
+        var groupTitle=Text(guideSelection.Title,18); groupTitle.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; groupTitle.VerticalAlignment=VerticalAlignment.Center; groupTitle.TextWrapping=TextWrapping.NoWrap; groupTitle.TextTrimming=TextTrimming.CharacterEllipsis; Place(toolbar,groupTitle);
+        var sort=Choice("",["Default order","Channel name","Channel number"],"Default order"); sort.Width=142; sort.MinHeight=sort.Height=34; sort.Padding=new Thickness(10,5,10,5); Place(toolbar,sort,0,1);
+        var timeActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=2 };
+        timeActions.Children.Add(IconButton("\uE76B","Previous six hours",()=> { guideStart=guideStart.AddMinutes(-GuideGeometry.WindowMinutes); refreshGuide?.Invoke(); }));
+        var nowButton=Button("Now",()=> { guideStart=HalfHour(DateTimeOffset.Now).AddHours(-1); refreshGuide?.Invoke(); }); nowButton.Foreground=new SolidColorBrush(Color("#F1FA8C")); timeActions.Children.Add(nowButton);
+        timeActions.Children.Add(IconButton("\uE76C","Next six hours",()=> { guideStart=guideStart.AddMinutes(GuideGeometry.WindowMinutes); refreshGuide?.Invoke(); }));
+        timeActions.Children.Add(IconButton("\uE72C","Refresh guide",()=>_=GuardAsync(()=>RefreshAllAsync(true))));
+        var date=Text(guideStart.LocalDateTime.ToString("ddd, dd MMM"),11); date.VerticalAlignment=VerticalAlignment.Center; date.Margin=new Thickness(8,0,4,0); date.Opacity=.7; timeActions.Children.Add(date); Place(toolbar,timeActions,0,2);
+        foreach(var button in timeActions.Children.OfType<Button>()) { button.MinHeight=button.Height=32; button.MinWidth=0; button.Padding=new Thickness(8,4,8,4); if(button.Content is FontIcon) button.Width=28; }
+        var search=SearchBox("Search channels & programs"); search.Width=230; search.Compact(); Place(toolbar,search,0,3); Place(main,toolbar,1);
+        toolbar.SizeChanged+=(_,_)=> { var wide=toolbar.ActualWidth>=1000; search.Width=wide ? 250 : 196; date.Visibility=toolbar.ActualWidth>=860 ? Visibility.Visible : Visibility.Collapsed; sort.Width=toolbar.ActualWidth>=800 ? 142 : 110; };
+        var rows=new ObservableCollection<GuideRow>(); var list=new ListView { ItemsSource=rows,SelectionMode=ListViewSelectionMode.None,IsSwipeEnabled=true };
+        QuietItems(list); WatchArtwork(list,96); ScrollViewer.SetHorizontalScrollMode(list,ScrollMode.Disabled);
+        list.ItemContainerStyle=new Style(typeof(ListViewItem)) { Setters={new Setter(Control.PaddingProperty,new Thickness(0)),new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch),new Setter(Control.MinHeightProperty,rowHeight)} };
+        list.ItemTemplate=(DataTemplate)XamlReader.Load("<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><Grid Height='88' Background='Transparent'/></DataTemplate>");
+        var body=new Grid { BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,.5,0,0) }; body.RowDefinitions.Add(new() { Height=new(34) }); body.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); body.RowDefinitions.Add(new() { Height=new(12) });
+        var header=new Grid { BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,0,0,.5) }; header.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); header.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        var count=Text("CHANNELS",10); count.CharacterSpacing=100; count.Margin=new Thickness(16,0,0,0); count.Opacity=.65; count.VerticalAlignment=VerticalAlignment.Center; Place(header,count);
+        var hours=new Canvas { Width=timelineWidth,Height=33 };
+        var headerScroll=new ScrollViewer { Content=hours,HorizontalScrollMode=ScrollMode.Enabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollMode=ScrollMode.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled }; Place(header,headerScroll,0,1); Place(body,header);
+        var viewport=new Grid(); Place(viewport,list); var empty=EmptyState("\uE714","No channels in this view","Choose another category or add channels to Favorites.","Browse all channels",()=> { guideSelection=new(ChannelScope.All); refreshGuide?.Invoke(); return Task.CompletedTask; }); Place(viewport,empty); Place(body,viewport,1);
+        var scrollRow=new Grid(); scrollRow.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); scrollRow.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        var scroll=new ScrollBar { Orientation=Orientation.Horizontal,Minimum=0,Maximum=timelineWidth,SmallChange=60,LargeChange=240,Height=12,MinHeight=0 }; Place(scrollRow,scroll,0,1); Place(body,scrollRow,2); Place(main,body,2);
+        double offset=0; bool scrolling=false,unloaded=false,refreshPending=false; CancellationTokenSource? pending=null;
+        var timelines=new Dictionary<Grid,Canvas>(); var updates=new Dictionary<Grid,Action>(); var qualityUpdates=new Dictionary<Grid,Action>();
+        void SetOffset(double value)
         {
-            void LabelPane(Button button,string glyph,string label,bool hidden)
-            {
-                if((string?)button.Tag==label) return; button.Tag=label;
-                button.Content=new StackPanel { Orientation=Orientation.Horizontal,Spacing=7,Children={ new FontIcon { Glyph=glyph,FontSize=14 },new TextBlock { Text=label,FontSize=12,VerticalAlignment=VerticalAlignment.Center } } };
-                button.Foreground=hidden ? new SolidColorBrush(Color(settings.Appearance.Accent)) : FieldText();
-                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button,label); ToolTipService.SetToolTip(button,label);
-            }
-            LabelPane(menuToggle,"\uE700",navigationHidden ? "Show menu" : "Hide menu",navigationHidden);
-            LabelPane(channelsToggle,"\uE8A4",guideChannelsHidden ? "Show channels" : "Hide channels",guideChannelsHidden);
-            header.ColumnDefinitions[0].Width=new(guideChannelsHidden ? 0 : 280); header.ColumnSpacing=guideChannelsHidden ? 0 : 12;
-            summary.Visibility=guideChannelsHidden ? Visibility.Collapsed : Visibility.Visible;
-            foreach(var update in paneUpdates.Values) update();
-            // Reserve room for the EPG even in a wide app window; the summary stays beside the preview.
-            if(info.ActualWidth>0 && page.ActualHeight>0)
-            {
-                var maxPreviewWidth=Math.Min(400,Math.Max(140,Math.Min(200,page.ActualHeight*.26))*16/9);
-                var previewWidth=Math.Min(Math.Max(240,info.ActualWidth*.38),maxPreviewWidth);
-                if(Math.Abs(info.ColumnDefinitions[0].Width.Value-previewWidth)>.5) info.ColumnDefinitions[0].Width=new(previewWidth);
-            }
+            value=Math.Clamp(value,0,Math.Max(0,timelineWidth-headerScroll.ActualWidth)); if(Math.Abs(value-offset)<.1) return; offset=value;
+            foreach(var canvas in timelines.Values) ((TranslateTransform)canvas.RenderTransform).X=-offset;
+            if(!scrolling) { scrolling=true; headerScroll.ChangeView(offset,null,null,true); scroll.Value=offset; scrolling=false; }
         }
-        updateGuidePanes=UpdatePanes;
-        page.SizeChanged+=(_,_)=>UpdatePanes();
-        info.SizeChanged+=(_,_)=>UpdatePanes();
+        scroll.ValueChanged+=(_,args)=> { if(!scrolling) SetOffset(args.NewValue); };
+        headerScroll.ViewChanged+=(_,_)=> { if(!scrolling) SetOffset(headerScroll.HorizontalOffset); };
+        headerScroll.SizeChanged+=(_,_)=> { scroll.Maximum=Math.Max(0,timelineWidth-headerScroll.ActualWidth); scroll.ViewportSize=headerScroll.ActualWidth; SetOffset(offset); };
+        list.AddHandler(UIElement.PointerWheelChangedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,e)=> { var properties=e.GetCurrentPoint(list).Properties; if(properties.IsHorizontalMouseWheel) { SetOffset(offset+properties.MouseWheelDelta); e.Handled=true; } }),true);
+        var tick=new DispatcherTimer { Interval=TimeSpan.FromSeconds(15) };
+        Border? headerNow=null;
+        void BuildHours()
+        {
+            hours.Children.Clear(); date.Text=guideStart.LocalDateTime.ToString("ddd, dd MMM");
+            for(int n=0;n<6;n++) { var line=new Border { Width=1,Height=34,Background=new SolidColorBrush(Color("#44475A")) }; Canvas.SetLeft(line,n*240); hours.Children.Add(line); var time=Text(guideStart.AddHours(n).LocalDateTime.ToString("HH:mm"),12); time.Opacity=.75; Canvas.SetLeft(time,n*240+10); Canvas.SetTop(time,9); hours.Children.Add(time); }
+            headerNow=new Border { Background=new SolidColorBrush(Color("#FF79C6")),Padding=new Thickness(5,1,5,1),CornerRadius=new CornerRadius(4),Child=new TextBlock { Text=DateTimeOffset.Now.ToString("HH:mm"),FontSize=10,Foreground=new SolidColorBrush(Color("#282A36")) } }; hours.Children.Add(headerNow);
+            UpdateClock();
+        }
+        void UpdateClock()
+        {
+            var x=(DateTimeOffset.Now-guideStart).TotalMinutes*GuideGeometry.PixelsPerMinute;
+            if(headerNow!=null) { headerNow.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; Canvas.SetLeft(headerNow,Math.Clamp(x-18,0,timelineWidth-42)); Canvas.SetTop(headerNow,7); ((TextBlock)headerNow.Child).Text=DateTimeOffset.Now.ToString("HH:mm"); }
+        }
         GuideReorder reorder=null!;
+        async Task PersistOrderAsync() { if(!unloaded && ReferenceEquals(profile,settings.Profile) && guideSelection.Scope==ChannelScope.Favorites) { FavoriteGuide.SaveOrder(profile,items,rows.Select(row=>row.Channel.Id)); await store.SaveAsync(settings); } }
         reorder=new GuideReorder(list,rows,()=>pending?.Cancel(),changed=>_=GuardAsync(async ()=> { if(changed) await PersistOrderAsync(); if(refreshPending) { refreshPending=false; await PopulateAsync(false); } }));
-        async Task PersistOrderAsync()
-        {
-            if(unloaded || !ReferenceEquals(settings.Profile,profile)) return;
-            FavoriteGuide.SaveOrder(profile,items,rows.Select(row=>row.Channel.Id)); await store.SaveAsync(settings); status.Text="Favorite guide order saved.";
-        }
-        async Task MoveAsync(GuideRow row,int direction)
-        {
-            var from=rows.IndexOf(row); var to=from+direction; if(from<0 || to<0 || to>=rows.Count) return;
-            rows.Move(from,to); await PersistOrderAsync();
-        }
         void ShowOptions(Button button,GuideRow row)
         {
-            var menu=new MenuFlyout(); var index=rows.IndexOf(row);
-            var up=new MenuFlyoutItem { Text="Move up",IsEnabled=index>0,Icon=new FontIcon { Glyph="\uE70E" } };
-            var down=new MenuFlyoutItem { Text="Move down",IsEnabled=index>=0 && index<rows.Count-1,Icon=new FontIcon { Glyph="\uE70D" } };
-            up.Click+=(_,_)=>_=GuardAsync(()=>MoveAsync(row,-1)); down.Click+=(_,_)=>_=GuardAsync(()=>MoveAsync(row,1));
-            var remove=new MenuFlyoutItem { Text="Remove from favorites",Icon=new FontIcon { Glyph="\uE735",Foreground=new SolidColorBrush(Color("#F1FA8C")) } }; remove.Click+=(_,_)=>_=GuardAsync(()=>ToggleFavoriteAsync(row.Channel));
-            menu.Items.Add(up); menu.Items.Add(down); menu.Items.Add(new MenuFlyoutSeparator()); menu.Items.Add(remove); menu.ShowAt(button);
+            var menu=new MenuFlyout(); var watch=new MenuFlyoutItem { Text="Watch channel",Icon=new FontIcon { Glyph="\uE768" } }; watch.Click+=(_,_)=>_=GuardAsync(()=>PlayAsync(row.Channel)); menu.Items.Add(watch);
+            var favorite=new MenuFlyoutItem { Text=profile.Favorites.Contains(row.Channel.Id) ? "Remove from favorites" : "Add to favorites" }; favorite.Click+=(_,_)=>_=GuardAsync(()=>ToggleFavoriteAsync(row.Channel)); menu.Items.Add(favorite); menu.ShowAt(button);
         }
-        void BuildGuideContainer(ListViewBase sender,ContainerContentChangingEventArgs args)
+        void BuildRow(ListViewBase sender,ContainerContentChangingEventArgs args)
         {
             if(args.ItemContainer.ContentTemplateRoot is not Grid grid) return;
-            if(args.InRecycleQueue) { timeUpdates.Remove(grid); paneUpdates.Remove(grid); return; }
+            if(args.InRecycleQueue) { timelines.Remove(grid); updates.Remove(grid); qualityUpdates.Remove(grid); return; }
             if(args.Item is not GuideRow row) return;
-            grid.Children.Clear(); grid.ColumnDefinitions.Clear(); grid.RowDefinitions.Clear(); grid.ColumnSpacing=12;
-            grid.RowDefinitions.Add(new() { Height=GridLength.Auto }); grid.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new() { Width=new(280) }); grid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-            var channel=new Grid { ColumnSpacing=6 }; channel.ColumnDefinitions.Add(new() { Width=new(24) }); channel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); channel.ColumnDefinitions.Add(new() { Width=new(34) });
-            Place(channel,reorder.Grip(row,grid));
-            var watchChannel=Button("",()=>_=GuardAsync(()=>PlayAsync(row.Channel))); watchChannel.Padding=new Thickness(4); watchChannel.Background=null; watchChannel.BorderThickness=new Thickness(0); watchChannel.HorizontalAlignment=HorizontalAlignment.Stretch; watchChannel.HorizontalContentAlignment=HorizontalAlignment.Stretch;
-            var name=Text(row.Channel.Name,13); name.TextWrapping=TextWrapping.NoWrap; name.TextTrimming=TextTrimming.CharacterEllipsis; name.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold;
-            var number=Text($"{row.Channel.Number:000}  ·  {profile.Sources.FirstOrDefault(s=>s.Id==row.Channel.SourceId)?.Name??"Favorite"}",10); number.Opacity=.65; number.TextWrapping=TextWrapping.NoWrap; number.TextTrimming=TextTrimming.CharacterEllipsis;
-            var identity=Stack(name,number); identity.Spacing=5; identity.VerticalAlignment=VerticalAlignment.Center;
-            var logo=new Grid { Width=40,Height=40 }; logo.Children.Add(new FontIcon { Glyph="\uE714",FontSize=17,Opacity=.4 });
-            var image=new Image { Stretch=Stretch.Uniform }; image.SetBinding(Image.SourceProperty,new Binding { Source=row,Path=new PropertyPath(nameof(ArtworkRow.Artwork)) }); logo.Children.Add(image);
-            var channelLabel=new Grid { ColumnSpacing=8 }; channelLabel.ColumnDefinitions.Add(new() { Width=new(40) }); channelLabel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); Place(channelLabel,logo); Place(channelLabel,identity,0,1);
-            watchChannel.Content=channelLabel; Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(watchChannel,"Watch "+row.Channel.Name); ToolTipService.SetToolTip(watchChannel,row.Channel.Name); Place(channel,watchChannel,0,1);
-            Button? options=null; options=IconButton("\uE712","Options for "+row.Channel.Name,()=>ShowOptions(options!,row)); options.Width=34; Place(channel,options,0,2); Place(grid,channel,1);
-            // Keep each timeline identifiable when the channel sidebar is tucked away.
-            var compactName=Text($"{row.Channel.Number:000}  ·  {row.Channel.Name}",10); compactName.Opacity=.75; compactName.Margin=new Thickness(10,0,10,5); compactName.TextWrapping=TextWrapping.NoWrap; compactName.TextTrimming=TextTrimming.CharacterEllipsis; Place(grid,compactName,0,1);
-            void UpdateRowPane()
-            {
-                grid.ColumnDefinitions[0].Width=new(guideChannelsHidden ? 0 : 280); grid.ColumnSpacing=guideChannelsHidden ? 0 : 12;
-                channel.Visibility=guideChannelsHidden ? Visibility.Collapsed : Visibility.Visible;
-                compactName.Visibility=guideChannelsHidden ? Visibility.Visible : Visibility.Collapsed;
-                grid.Height=guideChannelsHidden ? 106 : 84;
-            }
-            paneUpdates[grid]=UpdateRowPane; UpdateRowPane();
-            var timeline=new Grid(); var updates=new List<Action>();
-            if(row.Shows.Length==0) { var missing=Text("Schedule unavailable · Select the channel to watch",12); missing.Opacity=.65; missing.VerticalAlignment=VerticalAlignment.Center; missing.Margin=new Thickness(12); timeline.Children.Add(missing); }
+            grid.Children.Clear(); grid.ColumnDefinitions.Clear(); grid.ColumnDefinitions.Add(new() { Width=new(channelWidth) }); grid.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); grid.BorderBrush=new SolidColorBrush(Color("#44475A")); grid.BorderThickness=new Thickness(0,0,0,.5);
+            var channel=new Grid { Padding=new Thickness(8,0,8,0),ColumnSpacing=8,Background=new SolidColorBrush(Color("#21222C")),BorderBrush=new SolidColorBrush(Color("#44475A")),BorderThickness=new Thickness(0,0,.5,0) };
+            channel.ColumnDefinitions.Add(new() { Width=new(18) }); channel.ColumnDefinitions.Add(new() { Width=new(40) }); channel.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); channel.ColumnDefinitions.Add(new() { Width=new(28) });
+            if(guideSelection.Scope==ChannelScope.Favorites && (string)sort.SelectedItem=="Default order") Place(channel,reorder.Grip(row,grid));
+            var logo=new Grid { Width=38,Height=38 }; logo.Children.Add(new FontIcon { Glyph="\uE714",FontSize=18,Opacity=.3 }); var image=new Image { Stretch=Stretch.Uniform }; image.SetBinding(Image.SourceProperty,new Binding { Source=row,Path=new PropertyPath(nameof(ArtworkRow.Artwork)) }); logo.Children.Add(image); Place(channel,logo,0,1);
+            var name=Text(row.Channel.Name,12); name.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; name.TextWrapping=TextWrapping.NoWrap; name.TextTrimming=TextTrimming.CharacterEllipsis;
+            var badges=new StackPanel { Orientation=Orientation.Horizontal,Spacing=4 }; FillQuality(badges,row.Channel); qualityUpdates[grid]=()=>FillQuality(badges,row.Channel);
+            var current=Text("",11); current.Opacity=.65; current.TextWrapping=TextWrapping.NoWrap; current.TextTrimming=TextTrimming.CharacterEllipsis;
+            var identity=Stack(name,badges,current); identity.Spacing=4; identity.VerticalAlignment=VerticalAlignment.Center;
+            var watch=Button("",()=>_=GuardAsync(()=>PlayAsync(row.Channel))); watch.Content=identity; watch.Padding=new Thickness(0); watch.Background=null; watch.BorderThickness=new Thickness(0); watch.HorizontalAlignment=HorizontalAlignment.Stretch; watch.HorizontalContentAlignment=HorizontalAlignment.Stretch; ToolTipService.SetToolTip(watch,row.Channel.Name); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(watch,"Watch "+row.Channel.Name); Place(channel,watch,0,2);
+            Button? heart=null; heart=IconButton("\uEB52","Favorite "+row.Channel.Name,()=>_=GuardAsync(()=>ToggleFavoriteAsync(row.Channel))); heart.Width=28; heart.MinHeight=heart.Height=32; ((FontIcon)heart.Content).FontSize=16; heart.Foreground=new SolidColorBrush(Color(profile.Favorites.Contains(row.Channel.Id) ? "#FF79C6" : "#6272A4")); Place(channel,heart,0,3); heart.RightTapped+=(_,e)=> { ShowOptions(heart,row); e.Handled=true; }; Place(grid,channel);
+            var clip=new Grid(); var canvas=new Canvas { Width=timelineWidth,Height=rowHeight,RenderTransform=new TranslateTransform { X=-offset } }; clip.Children.Add(canvas); clip.SizeChanged+=(_,_)=>clip.Clip=new RectangleGeometry { Rect=new Rect(0,0,clip.ActualWidth,rowHeight) }; Place(grid,clip,0,1); timelines[grid]=canvas;
+            var cellUpdates=new List<Action>();
+            if(row.Shows.Length==0) { var missing=Text("No program data",12); missing.Opacity=.55; Canvas.SetLeft(missing,16); Canvas.SetTop(missing,34); canvas.Children.Add(missing); }
             foreach(var show in row.Shows)
             {
-                var start=Math.Clamp((show.Start-row.Start).TotalMinutes,0,row.Minutes); var end=Math.Clamp((show.End-row.Start).TotalMinutes,0,row.Minutes);
-                var title=Text(show.Title,13); title.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; title.TextWrapping=TextWrapping.NoWrap; title.TextTrimming=TextTrimming.CharacterEllipsis;
-                var time=Text(show.TimeLabel,10); time.Opacity=.7; time.TextWrapping=TextWrapping.NoWrap; time.TextTrimming=TextTrimming.CharacterEllipsis;
-                var state=Text("",10); state.TextWrapping=TextWrapping.NoWrap; state.TextTrimming=TextTrimming.CharacterEllipsis;
-                var progress=new ProgressBar { Minimum=0,Maximum=100,Height=2,MinHeight=2,Foreground=new SolidColorBrush(Color("#50FA7B")),Background=new SolidColorBrush(Color("#44475A")),Margin=new Thickness(0,3,0,0) };
-                var content=Stack(title,time,state,progress); content.Spacing=4;
-                var cell=Button("",()=> { SelectProgramme(row.Channel,show); if(show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now) _=GuardAsync(()=>PlayAsync(row.Channel)); }); cell.Content=content; cell.MinHeight=cell.MaxHeight=80; cell.MinWidth=0; cell.Margin=new Thickness(2,0,2,0); cell.HorizontalAlignment=HorizontalAlignment.Stretch; cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.Background=new SolidColorBrush(Color(LightFields ? "#F1F2F4" : "#282A36")); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(8);
-                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(cell,show.Title+", "+show.TimeLabel); ToolTipService.SetToolTip(cell,show.Title+" · "+show.TimeLabel);
-                Action update=()=> {
-                    var current=show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start;
-                    state.Text=current ? $"ON NOW · {Math.Max(1,(int)Math.Ceiling((show.End-DateTimeOffset.Now).TotalMinutes))} min left" : show.IsPremiere ? "PREMIERE" : show.IsNew ? "NEW" : show.IsRepeat ? "REPEAT" : $"{(int)Math.Ceiling((show.End-show.Start).TotalMinutes)} min";
-                    state.Foreground=new SolidColorBrush(Color(current ? LightFields ? "#089108" : "#50FA7B" : LightFields ? "#815CD6" : show.IsNew || show.IsPremiere ? "#F1FA8C" : "#BD93F9")); progress.Visibility=current ? Visibility.Visible : Visibility.Collapsed;
-                    progress.Value=Math.Clamp((DateTimeOffset.Now-show.Start).TotalSeconds/(show.End-show.Start).TotalSeconds*100,0,100);
-                    cell.BorderThickness=new Thickness(selected ? 1 : 0); cell.BorderBrush=new SolidColorBrush(Color("#BD93F9"));
-                };
-                update(); updates.Add(update); cell.Click+=(_,_)=> { foreach(var updateVisible in timeUpdates.Values) updateVisible(); };
-                var segment=new Grid(); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,start),GridUnitType.Star) }); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,end-start),GridUnitType.Star) }); segment.ColumnDefinitions.Add(new() { Width=new(Math.Max(.001,row.Minutes-end),GridUnitType.Star) }); Place(segment,cell,0,1); timeline.Children.Add(segment);
+                if(GuideGeometry.Segment(show.Start,show.End,row.Start) is not { } segment) continue;
+                var programTitle=Text(show.Title,13); programTitle.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; programTitle.TextWrapping=TextWrapping.NoWrap; programTitle.TextTrimming=TextTrimming.CharacterEllipsis;
+                var time=Text(show.TimeLabel,11); time.Opacity=.68; time.TextWrapping=TextWrapping.NoWrap; time.TextTrimming=TextTrimming.CharacterEllipsis;
+                var flag=Text(show.IsPremiere ? "PREMIERE" : show.IsNew ? "NEW" : "",9); flag.Foreground=new SolidColorBrush(Color("#F1FA8C")); flag.Visibility=flag.Text=="" ? Visibility.Collapsed : Visibility.Visible;
+                var progress=new ProgressBar { Height=2,MinHeight=2,Maximum=100,Foreground=new SolidColorBrush(Color("#50FA7B")),Background=new SolidColorBrush(Color("#44475A")),VerticalAlignment=VerticalAlignment.Bottom };
+                var copyStack=Stack(programTitle,time,flag); copyStack.Spacing=4; var content=new Grid(); content.Children.Add(copyStack); content.Children.Add(progress);
+                var cell=Button("",()=> { SelectProgram(row.Channel,show); if(show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now) _=GuardAsync(()=>PlayAsync(row.Channel)); foreach(var update in updates.Values) update(); }); cell.Content=content; cell.MinWidth=cell.MinHeight=0; cell.Height=80; cell.Width=Math.Max(1,segment.Width-4); cell.Padding=new Thickness(10,8,10,8); cell.CornerRadius=new CornerRadius(6); cell.HorizontalContentAlignment=HorizontalAlignment.Stretch; cell.VerticalContentAlignment=VerticalAlignment.Stretch;
+                ToolTipService.SetToolTip(cell,show.Title+" · "+show.TimeLabel); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(cell,row.Channel.Name+", "+show.Title+", "+show.TimeLabel);
+                cell.RightTapped+=(_,e)=> { _=GuardAsync(()=>ProgrammeDetailsAsync(row.Channel,show)); e.Handled=true; };
+                Canvas.SetLeft(cell,segment.Left+2); Canvas.SetTop(cell,4); canvas.Children.Add(cell);
+                cellUpdates.Add(()=> { var live=show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now; var selected=selectedChannel?.Id==row.Channel.Id && selectedShow?.Start==show.Start; cell.Background=new SolidColorBrush(Color(live ? "#403A52" : "#282A36")); cell.BorderBrush=new SolidColorBrush(Color(live || selected ? "#BD93F9" : "#282A36")); cell.BorderThickness=new Thickness(live || selected ? 1 : 0); progress.Visibility=live ? Visibility.Visible : Visibility.Collapsed; progress.Value=Math.Clamp((DateTimeOffset.Now-show.Start).TotalSeconds/(show.End-show.Start).TotalSeconds*100,0,100); });
             }
-            timeUpdates[grid]=()=> { foreach(var update in updates) update(); }; Place(grid,timeline,1,1);
+            var marker=new Border { Width=1.5,Height=rowHeight,Background=new SolidColorBrush(Color("#FF79C6")),IsHitTestVisible=false }; canvas.Children.Add(marker);
+            updates[grid]=()=> { foreach(var update in cellUpdates) update(); var now=DateTimeOffset.Now; current.Text=row.Shows.FirstOrDefault(show=>show.Start<=now && show.End>now)?.Title??"No program data"; var x=(now-row.Start).TotalMinutes*GuideGeometry.PixelsPerMinute; marker.Visibility=x>=0 && x<timelineWidth ? Visibility.Visible : Visibility.Collapsed; Canvas.SetLeft(marker,x); };
+            updates[grid]();
         }
-        list.ContainerContentChanging+=(sender,args)=> { if(args.InRecycleQueue) { BuildGuideContainer(sender,args); return; } if(args.Phase==0) { args.RegisterUpdateCallback(1,BuildGuideContainer); return; } BuildGuideContainer(sender,args); };
+        list.ContainerContentChanging+=(sender,args)=> { if(args.InRecycleQueue) { BuildRow(sender,args); return; } if(args.Phase==0) { args.RegisterUpdateCallback(1,BuildRow); return; } BuildRow(sender,args); };
         async Task PopulateAsync(bool debounce)
         {
             if(unloaded) return; if(reorder.IsDragging) { refreshPending=true; return; }
             pending?.Cancel(); pending?.Dispose(); var request=pending=new(); var ct=request.Token;
             try
             {
-                if(debounce) await Task.Delay(180,ct);
-                var term=search.Text.Trim(); var channelSnapshot=FavoriteGuide.Channels(items,profile);
-                var sources=profile.Sources.ToDictionary(s=>s.Id,s=>new Dictionary<string,string>(s.EpgMappings)); var indices=guideIndices.ToDictionary(e=>e.Key,e=>e.Value.Index);
-                var start=guideStart; var slots=guideSlots; var minutes=slots*30; var end=start.AddMinutes(minutes);
-                date.Text=start.LocalDateTime.ToString("ddd, dd MMM  ·  HH:mm")+"  ·  Local time";
-                var found=await Task.Run(()=> { var result=new List<GuideRow>(); foreach(var channel in channelSnapshot) { ct.ThrowIfCancellationRequested(); var id=sources.GetValueOrDefault(channel.SourceId)?.GetValueOrDefault(channel.Id,channel.EpgId=="" ? channel.Id : channel.EpgId)??channel.EpgId; var shows=(indices.GetValueOrDefault(channel.SourceId)??EmptyGuide).Window(id,start,end).ToArray(); if(term!="" && !channel.Name.Contains(term,StringComparison.OrdinalIgnoreCase) && !shows.Any(show=>show.Title.Contains(term,StringComparison.OrdinalIgnoreCase))) continue; result.Add(new(channel,shows,start,minutes)); } return result; },ct);
-                ct.ThrowIfCancellationRequested(); rows.Clear(); timeUpdates.Clear(); paneUpdates.Clear(); foreach(var row in found) rows.Add(row);
-                hours.Children.Clear(); hours.ColumnDefinitions.Clear();
-                for(int n=0;n<slots;n++) { hours.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); var time=Text(start.AddMinutes(n*30).LocalDateTime.ToString("HH:mm"),11); time.Opacity=.7; Place(hours,time,0,n); }
-                summary.Text=$"FAVORITES  ·  {rows.Count:N0}"; guideHasRows=rows.Count>0; empty.Visibility=guideHasRows || fullscreen || expandedVideo ? Visibility.Collapsed : Visibility.Visible;
-                if(!found.Any(row=>row.Channel.Id==selectedChannel?.Id && row.Shows.Any(show=>show.Start==selectedShow?.Start))) { selectedChannel=null; selectedShow=null; }
-                if(selectedShow==null)
-                {
-                    var available=found.SelectMany(row=>row.Shows.Select(show=>(row.Channel,Show:show))).ToArray();
-                    var first=available.FirstOrDefault(pair=>pair.Channel.Id==playing?.Id && pair.Show.Start<=DateTimeOffset.Now && pair.Show.End>DateTimeOffset.Now);
-                    if(first.Show==null) first=available.FirstOrDefault(pair=>pair.Show.Start<=DateTimeOffset.Now && pair.Show.End>DateTimeOffset.Now);
-                    if(first.Show==null) first=available.FirstOrDefault();
-                    if(first.Show!=null) SelectProgramme(first.Channel,first.Show);
-                    else if(found.Count>0) { selectedChannel=found[0].Channel; infoContext.Text=$"CHANNEL  ·  {selectedChannel.Number:000}  {selectedChannel.Name}"; infoContext.Foreground=FieldText(); infoTitle.Text="Schedule unavailable"; infoMeta.Visibility=Visibility.Collapsed; infoDescription.Text="Click the channel name to preview it here. Your favorite stays in the guide while program information is unavailable."; }
-                }
-                if(term!="" && rows.Count==0) empty.Child=EmptyState("\uE721","No matching favorites or programs.","Try a channel name, a program title, or a different time.","Clear search",()=> { search.Text=""; return Task.CompletedTask; });
-                else if(channelSnapshot.Length==0) empty.Child=EmptyState("\uE735","Build your favorite guide.","Star channels in Live TV and they will appear here, ready to arrange.","Choose favorite channels",()=> { Navigate("Live TV"); return Task.CompletedTask; });
+                if(debounce) await Task.Delay(180,ct); var term=search.Text.Trim(); var selection=guideSelection; var channels=ChannelBrowse.Select(items,profile,selection); var order=(string)sort.SelectedItem;
+                var sources=profile.Sources.ToDictionary(s=>s.Id,s=>new Dictionary<string,string>(s.EpgMappings)); var indices=guideIndices.ToDictionary(pair=>pair.Key,pair=>pair.Value.Index); var start=guideStart;
+                var found=await Task.Run(()=> { IEnumerable<MediaItem> sorted=order=="Channel name" ? channels.OrderBy(c=>c.Name,StringComparer.CurrentCultureIgnoreCase) : order=="Channel number" ? channels.OrderBy(c=>c.Number) : channels; var result=new List<GuideRow>(); foreach(var channel in sorted) { ct.ThrowIfCancellationRequested(); var id=sources.GetValueOrDefault(channel.SourceId)?.GetValueOrDefault(channel.Id,channel.EpgId=="" ? channel.Id : channel.EpgId)??channel.EpgId; var shows=(indices.GetValueOrDefault(channel.SourceId)??EmptyGuide).Window(id,start,start.AddMinutes(GuideGeometry.WindowMinutes)).ToArray(); if(term!="" && !channel.Name.Contains(term,StringComparison.OrdinalIgnoreCase) && !shows.Any(show=>show.Title.Contains(term,StringComparison.OrdinalIgnoreCase))) continue; result.Add(new(channel,shows,start)); } return result; },ct);
+                ct.ThrowIfCancellationRequested(); timelines.Clear(); updates.Clear(); qualityUpdates.Clear(); rows.Clear(); foreach(var row in found) rows.Add(row); BuildHours();
+                groupTitle.Text=selection.Title; count.Text=$"CHANNELS · {found.Count:N0}"; rail.Select(selection); empty.Visibility=found.Count==0 ? Visibility.Visible : Visibility.Collapsed;
+                if(!found.Any(row=>row.Channel.Id==selectedChannel?.Id)) { selectedChannel=null; selectedShow=null; }
+                if(selectedChannel!=null && (selectedShow==null || !found.First(row=>row.Channel.Id==selectedChannel.Id).Shows.Contains(selectedShow))) { var row=found.First(row=>row.Channel.Id==selectedChannel.Id); SelectProgram(row.Channel,row.Shows.FirstOrDefault(show=>show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now)??row.Shows.FirstOrDefault()); }
+                if(selectedChannel==null && found.Count>0) { var row=found.FirstOrDefault(row=>row.Channel.Id==playing?.Id)??found[0]; SelectProgram(row.Channel,row.Shows.FirstOrDefault(show=>show.Start<=DateTimeOffset.Now && show.End>DateTimeOffset.Now)??row.Shows.FirstOrDefault()); }
+                SetOffset(0);
             }
             catch(OperationCanceledException) { }
         }
-        tick.Tick+=(_,_)=> { if(currentTab!="Guide" || reorder.IsDragging) return; UpdateInfo(); foreach(var update in timeUpdates.Values) update(); };
-        list.Loaded+=(_,_)=>tick.Start(); list.Unloaded+=(_,_)=> { unloaded=true; pending?.Cancel(); tick.Stop(); reorder.Dispose(); timeUpdates.Clear(); paneUpdates.Clear(); if(updateGuidePanes==(Action)UpdatePanes) updateGuidePanes=null; };
-        guideVideoExpanded=Card(new Grid(),new Thickness(0)); guideVideoExpanded.CornerRadius=new CornerRadius(0); guideVideoExpanded.Visibility=Visibility.Collapsed; Grid.SetRowSpan(guideVideoExpanded,4); Place(page,guideVideoExpanded);
-        page.Loaded+=(_,_)=>UpdateGuideVideoLayout();
-        hours.SizeChanged+=(_,_)=> {
-            if(unloaded || fullscreen || expandedVideo || hours.ActualWidth<=0) return;
-            var slots=Math.Clamp((int)(hours.ActualWidth/180),4,12);
-            if(slots==guideSlots) return; guideSlots=slots; _=GuardAsync(()=>PopulateAsync(true));
-        };
-        var selectChannel=selectGuideChannel;
-        selectGuideChannel=channel=> { selectChannel?.Invoke(channel); foreach(var update in timeUpdates.Values) update(); };
-        search.TextChanged+=(_,_)=>_=GuardAsync(()=>PopulateAsync(true)); refreshGuide=()=>_=GuardAsync(()=>PopulateAsync(false)); _=GuardAsync(()=>PopulateAsync(false)); return page;
+        refreshGuideQuality=()=> { foreach(var update in qualityUpdates.Values) update(); };
+        tick.Tick+=(_,_)=> { if(currentTab!="Guide" || reorder.IsDragging) return; UpdateInfo(); UpdateClock(); foreach(var update in updates.Values) update(); };
+        list.Loaded+=(_,_)=> { if(list.ItemsPanelRoot is ItemsStackPanel panel) panel.ItemsUpdatingScrollMode=ItemsUpdatingScrollMode.KeepScrollOffset; tick.Start(); }; list.Unloaded+=(_,_)=> { unloaded=true; pending?.Cancel(); tick.Stop(); reorder.Dispose(); timelines.Clear(); updates.Clear(); qualityUpdates.Clear(); refreshGuideQuality=null; };
+        guideVideoExpanded=Card(new Grid(),new Thickness(0)); guideVideoExpanded.CornerRadius=new CornerRadius(0); guideVideoExpanded.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(guideVideoExpanded,2); Place(page,guideVideoExpanded);
+        page.Loaded+=(_,_)=>UpdateGuideVideoLayout(); var select=selectGuideChannel; selectGuideChannel=channel=> { select?.Invoke(channel); foreach(var update in updates.Values) update(); };
+        sort.SelectionChanged+=(_,_)=>_=GuardAsync(()=>PopulateAsync(false)); search.TextChanged+=(_,_)=>_=GuardAsync(()=>PopulateAsync(true)); refreshGuide=()=>_=GuardAsync(()=>PopulateAsync(false)); _=GuardAsync(()=>PopulateAsync(false)); return page;
     }
     private async Task ProgrammeDetailsAsync(MediaItem channel,Programme show)
     {

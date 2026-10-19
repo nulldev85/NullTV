@@ -143,6 +143,14 @@ public sealed class MpvPlayer : IDisposable
         }
     }
     public string Stats() => $"Codec: {Get("video-codec")} · {Get("width")}×{Get("height")}\nDecode: {Get("hwdec-current")} · FPS: {Get("estimated-vf-fps")}\nVideo bitrate: {Number("video-bitrate")/1000:F0} kbps · Dropped: {Get("frame-drop-count")}\nAudio: {Get("audio-codec")} · Cache: {Number("demuxer-cache-duration"):F1} s";
+    public StreamObservation? ObserveQuality(string url)
+    {
+        if(State.Idle || !string.Equals(Get("path"),url,StringComparison.Ordinal)) return null;
+        var width=Number("width"); var height=Number("height"); if(width<=0 || height<=0) return null;
+        // Container frame rate is stable metadata; render FPS varies with stalls and pause.
+        var fps=Number("container-fps");
+        return new((int)width,(int)height,Math.Round(fps,2),Get("video-params/gamma"),ChannelQuality.Fingerprint(url),DateTimeOffset.UtcNow);
+    }
     public string StreamDetails()
     {
         var width=Number("width"); var height=Number("height"); if(width<=0 || height<=0) return "Waiting for stream information…";

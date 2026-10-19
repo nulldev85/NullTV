@@ -24,7 +24,7 @@ public sealed partial class MainWindow : Window
     private List<MediaItem> items=[];
     private readonly Grid root=new() { Background=new SolidColorBrush(Color("#282A36")),RequestedTheme=ElementTheme.Dark };
     private readonly Grid pageHost=new();
-    private readonly StackPanel navigation=new() { Orientation=Orientation.Vertical, Spacing=3 };
+    private readonly StackPanel navigation=new() { Orientation=Orientation.Horizontal, Spacing=8,VerticalAlignment=VerticalAlignment.Center };
     private Grid? titlebarChrome;
     private readonly PlayerKeyboardRouter nativeKeyboard;
     private Border? sidebar;
@@ -55,8 +55,8 @@ public sealed partial class MainWindow : Window
         var data=dataIndex>=0 && dataIndex+1<args.Length ? args[dataIndex+1] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NullTV");
         store=new(data); log=new(Path.Combine(data,"logs"));
         ExtendsContentIntoTitleBar=true;
-        root.RowDefinitions.Add(new() { Height=new(58) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto }); root.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto });
-        root.ColumnDefinitions.Add(new() { Width=new(184) }); root.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+        root.RowDefinitions.Add(new() { Height=new(36) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto }); root.RowDefinitions.Add(new() { Height=GridLength.Auto }); root.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto });
+        root.ColumnDefinitions.Add(new() { Width=new(0) }); root.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var titlebar=new Grid { Padding=new Thickness(16,0,150,0) }; titlebarChrome=titlebar; titlebar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); titlebar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var brand=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,VerticalAlignment=VerticalAlignment.Center };
         navigationToggle=IconButton("\uE700","Hide navigation",ToggleNavigation); navigationToggle.Width=navigationToggle.Height=navigationToggle.MinHeight=32; ((FontIcon)navigationToggle.Content).FontSize=15; brand.Children.Add(navigationToggle);
@@ -66,8 +66,7 @@ public sealed partial class MainWindow : Window
         Grid.SetColumnSpan(titlebar,2); root.Children.Add(titlebar); SetTitleBar(titlebar);
         titlebar.Loaded+=(_,_)=>UpdateNavigationHitRegion();
         root.LayoutUpdated+=(_,_)=>UpdateNavigationHitRegion();
-        navigation.Margin=new Thickness(12,16,12,0);
-        var label=Text("LIBRARY",10); label.CharacterSpacing=150; label.Opacity=.4; label.Margin=new Thickness(14,0,0,16); navigation.Children.Add(label);
+        navigation.Margin=new Thickness(20,10,20,10);
         var names=new[] { "Live TV","Guide","Movies & Series","Now Playing","Media Servers","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE768","\uE968","\uE713" };
         for(int i=0;i<names.Length;i++) {
             var name=names[i]; var b=Button(name,()=>Navigate(name)); b.Tag=name;
@@ -75,14 +74,13 @@ public sealed partial class MainWindow : Window
             Place(item,new Border { Width=2,Height=18,CornerRadius=new CornerRadius(1),Background=new SolidColorBrush(Color("#BD93F9")),Opacity=0 });
             Place(item,new FontIcon { Glyph=glyphs[i],FontSize=16 },0,1);
             Place(item,new TextBlock { Text=name=="Movies & Series" ? "Movies & series" : name,FontSize=13,VerticalAlignment=VerticalAlignment.Center },0,2);
-            b.Content=item; b.HorizontalAlignment=HorizontalAlignment.Stretch; b.HorizontalContentAlignment=HorizontalAlignment.Stretch; b.Padding=new Thickness(8,10,10,10); b.MinHeight=44; navigation.Children.Add(b);
+            b.Content=item; b.HorizontalContentAlignment=HorizontalAlignment.Stretch; b.Padding=new Thickness(12,9,16,9); b.MinHeight=40; b.CornerRadius=new CornerRadius(20); navigation.Children.Add(b);
         }
-        var rail=new Grid(); rail.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); rail.RowDefinitions.Add(new() { Height=GridLength.Auto }); Place(rail,navigation);
-        var railFooter=Stack(Text("YOUR SCREEN.\nYOUR SOURCES.",10)); railFooter.Opacity=.35; railFooter.Margin=new Thickness(26,16,16,24); Place(rail,railFooter,1);
-        sidebar=new Border { BorderThickness=new Thickness(0,0,.5,0),BorderBrush=new SolidColorBrush(Color("#44475A")),Child=rail }; Place(root,sidebar,2);
+        var navigationScroll=new ScrollViewer { Content=navigation,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollMode=ScrollMode.Enabled,VerticalScrollMode=ScrollMode.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalAlignment=HorizontalAlignment.Center };
+        sidebar=new Border { Background=new SolidColorBrush(Color("#282A36")),BorderThickness=new Thickness(0,0,0,.5),BorderBrush=new SolidColorBrush(Color("#44475A")),Child=navigationScroll }; Grid.SetColumnSpan(sidebar,2); Place(root,sidebar,1);
         BuildPlayerModeBar();
-        pageHost.Margin=new Thickness(28,18,28,20); Place(root,pageHost,2,1);
-        status.Margin=new Thickness(28,0,28,14); status.FontSize=11; status.Opacity=.45; Place(root,status,3,1);
+        pageHost.Margin=new Thickness(24,20,24,20); Place(root,pageHost,3,1);
+        status.Margin=new Thickness(24,0,24,10); status.FontSize=11; status.Opacity=.45; Place(root,status,4,1);
         root.KeyDown+=OnKey;
         root.AddHandler(UIElement.KeyDownEvent,new KeyEventHandler(OnEscape),true);
         root.PointerMoved+=(_,_)=>lastInput=DateTimeOffset.UtcNow;
@@ -194,12 +192,12 @@ public sealed partial class MainWindow : Window
             if(fullscreen) ToggleFullscreen(); expandedVideo=false;
             MoveVideo(videoHome); pageHost.Margin=new Thickness(28,18,28,20);
             if(sidebar!=null) sidebar.Visibility=navigationHidden ? Visibility.Collapsed : Visibility.Visible;
-            root.ColumnDefinitions[0].Width=new(navigationHidden ? 0 : 184);
-            guidePage=null; guidePreview=null; guideVideoExpanded=null; selectGuideChannel=null; refreshGuide=null; updateGuidePanes=null;
+            root.ColumnDefinitions[0].Width=new(0);
+            guidePage=null; guidePreview=null; guideVideoExpanded=null; guideCategoryRail=null; selectGuideChannel=null; refreshGuide=null; updateGuidePanes=null;
         }
         if(currentTab!="Guide" && tab!=currentTab) { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); }
         currentTab=tab; UpdatePlayerChrome(); playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s));
-        foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .72; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); if(b.Content is Grid item) { item.Children[0].Opacity=selected ? 1 : 0; ((TextBlock)item.Children[2]).FontWeight=selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal; } }
+        foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .76; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(selected ? Color("#BD93F9") : Color("#44475A")); b.BorderThickness=new Thickness(selected ? 1 : .5); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); if(b.Content is Grid item) { item.Children[0].Opacity=0; item.ColumnDefinitions[0].Width=new(0); ((TextBlock)item.Children[2]).FontWeight=selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal; } }
         foreach(var child in pageHost.Children) child.Visibility=Visibility.Collapsed;
         if(tab is "Live TV" or "Now Playing") { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s)); UpdateLiveLayout(); return; }
         // Other pages are rebuilt to reflect profile and settings changes.

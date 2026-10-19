@@ -10,7 +10,7 @@ public sealed partial class MainWindow
     private Action? refreshLibrary,refreshGuide;
     private static void QuietItems(ListViewBase list)
     {
-        foreach(var key in new[]{"ListViewItemBackgroundPointerOver","ListViewItemBackgroundSelectedPointerOver","GridViewItemBackgroundPointerOver","GridViewItemBackgroundSelectedPointerOver"}) list.Resources[key]=new SolidColorBrush(Colors.Transparent);
+        foreach(var key in new[]{"ListViewItemBackgroundPointerOver","ListViewItemBackgroundSelectedPointerOver","ListViewItemBackgroundPressed","ListViewItemBackgroundSelectedPressed","GridViewItemBackgroundPointerOver","GridViewItemBackgroundSelectedPointerOver","GridViewItemBackgroundPressed","GridViewItemBackgroundSelectedPressed"}) list.Resources[key]=new SolidColorBrush(Colors.Transparent);
         list.Resources["ControlCornerRadius"]=new CornerRadius(10);
         foreach(var key in new[]{"ListViewItemSelectionIndicatorBrush","ListViewItemSelectionIndicatorPointerOverBrush","ListViewItemSelectionIndicatorPressedBrush"}) list.Resources[key]=new SolidColorBrush(Color("#BD93F9"));
     }
@@ -38,7 +38,7 @@ public sealed partial class MainWindow
         if(expandedVideo || fullscreen) { navigationHidden=false; ExitPlayerView(); }
         else { navigationHidden=!navigationHidden; RefreshPlayerView(); }
     }
-    private void ToggleChannelPane() { channelsHidden=!channelsHidden; UpdateLiveLayout(); }
+    private void ToggleChannelPane() { liveCategoryRail?.Toggle(); }
     private void ToggleExpandedVideo()
     {
         if(fullscreen) { ExitPlayerView(); return; }

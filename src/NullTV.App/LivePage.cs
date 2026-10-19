@@ -20,11 +20,12 @@ public sealed partial class MainWindow
     private readonly Dictionary<VideoSurface,CancellationTokenSource> streamRequests=[];
     private MediaItem? playing;
     private CancellationTokenSource? playbackRequest;
-    private ListView? channelList,categoryList;
+    private ListView? channelList;
+    private IptvCategoryRail? liveCategoryRail;
+    private ChannelSelection liveSelection=new(ChannelScope.All);
     private SearchField? channelSearch;
     private TextBlock? playingTitle,playingInfo,liveSummary;
     private UIElement? emptyLive;
-    private ComboBox? categoryPicker;
     private Grid? videoGrid;
     private Border? videoHome;
     private bool compactVideoControls;
@@ -54,26 +55,33 @@ public sealed partial class MainWindow
         livePage.RowDefinitions.Add(new() { Height=GridLength.Auto }); livePage.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         livePage.ColumnDefinitions.Add(new() { Width=new(140) }); livePage.ColumnDefinitions.Add(new() { Width=new(304) }); livePage.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
         var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
-        actions.Children.Add(IconButton("\uE8A4","Toggle categories",ToggleChannelPane));
         actions.Children.Add(AsyncButton("+  Add source",()=>EditSourceAsync(null)));
-        liveHeading=Heading("Live TV","Find something worth watching.",actions); Grid.SetColumnSpan(liveHeading,3); Place(livePage,liveHeading);
+        liveHeading=Heading("Live TV","Find something worth watching.",actions); liveHeading.Margin=new Thickness(16,16,16,8); Grid.SetColumnSpan(liveHeading,2); Place(livePage,liveHeading,0,1);
         var movieActions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
         closeNowPlaying=Button("Close stream",StopPlayback); movieActions.Children.Add(closeNowPlaying);
         backToBrowse=Button("Back to browse",()=> { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); Navigate(playbackOrigin); }); movieActions.Children.Add(backToBrowse);
         libraryPlaybackHeading=Heading("Now playing","Your current stream. One player.",movieActions); libraryPlaybackHeading.Visibility=Visibility.Collapsed; Grid.SetColumnSpan(libraryPlaybackHeading,3); Place(livePage,libraryPlaybackHeading);
-        categoryList=new ListView { SelectionMode=ListViewSelectionMode.Single }; QuietItems(categoryList);
-        categoryList.SelectionChanged+=(_,_)=> { filter=categoryList.SelectedItem as string??"All channels"; _=GuardAsync(FilterLiveAsync); };
-        var categories=new Grid { RowSpacing=12 }; categoryRail=categories; categories.RowDefinitions.Add(new() { Height=GridLength.Auto }); categories.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); var catsTitle=Text("BROWSE",10); catsTitle.Opacity=.45; catsTitle.CharacterSpacing=120; Place(categories,catsTitle); Place(categories,categoryList,1); Place(livePage,categories,1);
+        liveCategoryRail=new(this,liveSelection,channelsHidden,selection=> { liveSelection=selection; filter=selection.Title; _=GuardAsync(FilterLiveAsync); },collapsed=> { channelsHidden=collapsed; UpdateLiveLayout(); }); categoryRail=liveCategoryRail; Grid.SetRowSpan(liveCategoryRail,2); Place(livePage,liveCategoryRail);
         var channels=new Grid { RowSpacing=14 }; channels.RowDefinitions.Add(new() { Height=GridLength.Auto }); channels.RowDefinitions.Add(new() { Height=GridLength.Auto }); channels.RowDefinitions.Add(new() { Height=GridLength.Auto }); channels.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         liveSummary=Text("CHANNELS",10); liveSummary.Opacity=.5; liveSummary.CharacterSpacing=100; Place(channels,liveSummary);
         channelSearch=SearchBox("Search channels"); channelSearch.TextChanged+=(sender,e)=> { _=GuardAsync(()=>FilterLiveAsync(true)); }; Place(channels,channelSearch,1);
-        categoryPicker=Choice("",["All channels"],"All channels"); categoryPicker.SelectionChanged+=(_,_)=> { if(categoryPicker.SelectedItem is string selected) { filter=selected; _=GuardAsync(FilterLiveAsync); } }; Place(channels,categoryPicker,2);
         channelList=new ListView { IsItemClickEnabled=true,SelectionMode=ListViewSelectionMode.Single };
-        channelList.ItemTemplate=(DataTemplate)XamlReader.Load("<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'><Grid Padding='2,9' MinHeight='70' ColumnSpacing='10'><Grid.ColumnDefinitions><ColumnDefinition Width='38'/><ColumnDefinition Width='*'/><ColumnDefinition Width='44'/></Grid.ColumnDefinitions><Border Width='38' Height='38' CornerRadius='9' Background='{ThemeResource NullTVFieldBackground}'><Grid><FontIcon Glyph='&#xE714;' FontSize='16' Opacity='.35'/><Image Source='{Binding Artwork}' Stretch='Uniform'/></Grid></Border><StackPanel Grid.Column='1' Spacing='5' VerticalAlignment='Center'><TextBlock Text='{Binding DisplayName}' FontSize='13' FontWeight='SemiBold' TextTrimming='CharacterEllipsis'/><TextBlock Text='{Binding NowNext}' FontSize='11' Opacity='.5' TextTrimming='CharacterEllipsis'/></StackPanel><Button x:Name='FavoriteChannelButton' Grid.Column='2' Width='44' MinHeight='44' Padding='0' Background='Transparent' BorderThickness='0' CornerRadius='8' ToolTipService.ToolTip='{Binding FavoriteLabel}' AutomationProperties.Name='{Binding FavoriteLabel}'><FontIcon Glyph='{Binding FavoriteGlyph}' Foreground='{Binding FavoriteBrush}' FontSize='16'/></Button></Grid></DataTemplate>");
+        channelList.ItemTemplate=(DataTemplate)XamlReader.Load("""
+<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
+<Border Margin='4' Padding='12' CornerRadius='10' BorderThickness='.5' BorderBrush='#44475A' Background='{ThemeResource NullTVFieldBackground}'>
+<Grid ColumnSpacing='10'><Grid.ColumnDefinitions><ColumnDefinition Width='44'/><ColumnDefinition Width='*'/><ColumnDefinition Width='28'/></Grid.ColumnDefinitions>
+<Grid Width='42' Height='42'><FontIcon Glyph='&#xE714;' FontSize='20' Opacity='.3'/><Image Source='{Binding Artwork}' Stretch='Uniform'/></Grid>
+<StackPanel Grid.Column='1' Spacing='6' VerticalAlignment='Center'><TextBlock Text='{Binding DisplayName}' FontSize='13' FontWeight='SemiBold' TextTrimming='CharacterEllipsis'/><StackPanel x:Name='ChannelQualityBadges' Orientation='Horizontal' Spacing='4'/><TextBlock Text='{Binding NowNext}' FontSize='11' Opacity='.65' TextTrimming='CharacterEllipsis' TextWrapping='Wrap' MaxLines='2'/></StackPanel>
+<Button x:Name='FavoriteChannelButton' Grid.Column='2' Width='28' MinHeight='32' Padding='0' Background='Transparent' BorderThickness='0' ToolTipService.ToolTip='{Binding FavoriteLabel}' AutomationProperties.Name='{Binding FavoriteLabel}'><FontIcon Glyph='&#xEB52;' Foreground='{Binding FavoriteBrush}' FontSize='17'/></Button>
+</Grid></Border></DataTemplate>
+""");
+        channelList.ItemContainerStyle=new Style(typeof(ListViewItem)) { Setters={new Setter(Control.PaddingProperty,new Thickness(0)),new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch),new Setter(Control.VerticalContentAlignmentProperty,VerticalAlignment.Stretch)} };
+        channelList.ItemsPanel=(ItemsPanelTemplate)XamlReader.Load("<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><ItemsWrapGrid Orientation='Horizontal' ItemWidth='320' ItemHeight='122'/></ItemsPanelTemplate>");
+        channelList.SizeChanged+=(_,_)=> { if(channelList.ItemsPanelRoot is ItemsWrapGrid wrap) { var width=Math.Max(200,channelList.ActualWidth-14); wrap.ItemWidth=width/Math.Max(1,(int)(width/300)); } };
         QuietItems(channelList); WatchArtwork(channelList,88); channelList.ContainerContentChanging+=PrepareChannelFavorite;
         channelList.ItemClick+=(_,e)=> { if(e.ClickedItem is ChannelRow row) _=GuardAsync(()=>PlayAsync(row.Item)); };
         channelList.RightTapped+=(_,e)=> { if(e.OriginalSource is FrameworkElement { DataContext:ChannelRow row }) { var menu=new MenuFlyout(); var item=new MenuFlyoutItem { Text=row.IsFavorite ? "Remove from favorites" : "Add to favorites",Icon=new FontIcon { Glyph=row.FavoriteGlyph } }; item.Click+=(_,_)=>_=GuardAsync(()=>ToggleFavoriteAsync(row.Item)); menu.Items.Add(item); menu.ShowAt(channelList,e.GetPosition(channelList)); e.Handled=true; } };
-        Place(channels,channelList,3); channelsCard=Card(channels,new Thickness(14)); Place(livePage,channelsCard,1,1);
+        Place(channels,channelList,3); channelsCard=Card(channels,new Thickness(16)); ((Border)channelsCard).CornerRadius=new CornerRadius(0); ((Border)channelsCard).BorderThickness=new Thickness(0); Place(livePage,channelsCard,1,1);
         var stage=new Grid { RowSpacing=14 }; playerStage=stage; stage.RowDefinitions.Add(new() { Height=GridLength.Auto }); stage.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         playingTitle=Text("PLAYER",10); playingTitle.CharacterSpacing=100; playingTitle.Opacity=.5; playingInfo=Text("",12); playingInfo.Opacity=.5; var heading=Stack(playingTitle,playingInfo); heading.Spacing=5; playerHeading=heading; Place(stage,heading);
         videoGrid=new Grid { Background=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(SurfaceHex)),ColumnSpacing=8,RowSpacing=8 };
@@ -154,14 +162,13 @@ public sealed partial class MainWindow
     private void UpdateLiveLayout()
     {
         UpdatePlayerChrome();
-        if(livePage==null) return; var available=pageHost.ActualWidth>0 ? pageHost.ActualWidth : 1000; var browse=currentTab=="Live TV"; var categories=browse && !channelsHidden && available>=900;
-        livePage.ColumnSpacing=categories ? 16 : 0;
-        livePage.ColumnDefinitions[0].Width=new(categories ? 140 : 0); livePage.ColumnDefinitions[1].Width=browse ? new(1,GridUnitType.Star) : new(0); livePage.ColumnDefinitions[2].Width=browse ? new(0) : new(1,GridUnitType.Star);
+        if(livePage==null) return; var browse=currentTab=="Live TV"; var categories=browse;
+        livePage.ColumnSpacing=0;
+        livePage.ColumnDefinitions[0].Width=new(categories ? channelsHidden ? 56 : 240 : 0); livePage.ColumnDefinitions[1].Width=browse ? new(1,GridUnitType.Star) : new(0); livePage.ColumnDefinitions[2].Width=browse ? new(0) : new(1,GridUnitType.Star);
         if(categoryRail!=null) categoryRail.Visibility=categories ? Visibility.Visible : Visibility.Collapsed;
         if(channelsCard is FrameworkElement channelsPane) { channelsPane.Visibility=browse ? Visibility.Visible : Visibility.Collapsed; Grid.SetColumn(channelsPane,1); Grid.SetColumnSpan(channelsPane,2); }
         if(playerStage!=null) { playerStage.Visibility=browse ? Visibility.Collapsed : Visibility.Visible; Grid.SetColumn(playerStage,0); Grid.SetColumnSpan(playerStage,3); }
         if(playerStage!=null) playerStage.RowSpacing=currentTab=="Now Playing" || expandedVideo || fullscreen ? 0 : 14;
-        if(categoryPicker!=null) categoryPicker.Visibility=browse && !categories ? Visibility.Visible : Visibility.Collapsed;
         if(liveHeading!=null) liveHeading.Visibility=browse ? Visibility.Visible : Visibility.Collapsed;
         if(libraryPlaybackHeading!=null) libraryPlaybackHeading.Visibility=currentTab=="Now Playing" && !expandedVideo && !fullscreen ? Visibility.Visible : Visibility.Collapsed;
         if(playerHeading!=null) playerHeading.Visibility=expandedVideo || fullscreen || currentTab=="Now Playing" ? Visibility.Collapsed : Visibility.Visible;
@@ -222,6 +229,7 @@ public sealed partial class MainWindow
         foreach(var tile in surfaces) tile.Player?.Set("mute",tile==surface ? "no" : "yes"); surface.Hide(false); if(emptyLive!=null) emptyLive.Visibility=Visibility.Collapsed;
         if(playingTitle!=null) { playingTitle.Text=item.Name; playingTitle.FontSize=18; playingTitle.Opacity=1; playingTitle.CharacterSpacing=0; } if(playingInfo!=null) playingInfo.Text=$"{item.Category}  ·  {(item.ArchiveDays>0 ? $"{item.ArchiveDays} day archive" : item.Kind==MediaKind.Live ? "LIVE" : "Direct play")}"; UpdateLiveLayout();
         settings.Profile.History[item.Id]=new(start,0,false,DateTimeOffset.UtcNow); await store.SaveAsync(settings);
+        liveCategoryRail?.Refresh(); guideCategoryRail?.Refresh();
         if(inGuide) { selectGuideChannel?.Invoke(item); UpdateGuideVideoLayout(); }
         video.Focus(FocusState.Programmatic); playerOverlay?.Reveal();
         if(settings.Profile.Sources.FirstOrDefault(s=>s.Id==item.SourceId) is { Kind: SourceKind.Jellyfin or SourceKind.Emby } server) _=GuardAsync(()=>new MediaServerClient(http).StartedAsync(server,item,lifetime.Token));
@@ -265,13 +273,11 @@ public sealed partial class MainWindow
         if(playingInfo!=null) playingInfo.Text="";
         ExitPlayerView(); status.Text="Playback stopped.";
     }
-    private void ChannelStep(int step) { var list=currentTab=="Guide" || playbackOrigin=="Guide" ? FavoriteGuide.Channels(items,settings.Profile).ToList() : (channelList?.ItemsSource as IEnumerable<ChannelRow>)?.Select(r=>r.Item).ToList()??[]; if(list.Count==0) return; var index=list.FindIndex(i=>i.Id==playing?.Id); _=GuardAsync(()=>PlayAsync(list[(index+step+list.Count)%list.Count])); }
+    private void ChannelStep(int step) { var list=currentTab=="Guide" || playbackOrigin=="Guide" ? ChannelBrowse.Select(items,settings.Profile,guideSelection).ToList() : (channelList?.ItemsSource as IEnumerable<ChannelRow>)?.Select(r=>r.Item).ToList()??[]; if(list.Count==0) return; var index=list.FindIndex(i=>i.Id==playing?.Id); _=GuardAsync(()=>PlayAsync(list[(index+step+list.Count)%list.Count])); }
     private void UpdateLive()
     {
-        if(categoryList==null) return;
-        var cats=new[] { "All channels","Favorites","Recently watched" }.Concat(items.Where(i=>i.Kind==MediaKind.Live).Select(i=>i.Category).Distinct().Order()).ToList();
-        if(!categoryList.Items.Cast<string>().SequenceEqual(cats)) { categoryList.ItemsSource=cats; categoryList.SelectedItem=cats.Contains(filter) ? filter : "All channels"; }
-        if(categoryPicker!=null && !categoryPicker.Items.Cast<string>().SequenceEqual(cats)) { categoryPicker.ItemsSource=cats; categoryPicker.SelectedItem=cats.Contains(filter) ? filter : "All channels"; }
+        if(channelList==null) return;
+        liveCategoryRail?.Refresh();
         UpdateLiveLayout();
         _=GuardAsync(FilterLiveAsync);
     }
@@ -288,10 +294,11 @@ public sealed partial class MainWindow
                 var catalog=items; liveRowsTask=Task.Run(()=>catalog.Where(i=>i.Kind==MediaKind.Live).Select(i=>new ChannelRow(i)).ToArray());
             }
             if(liveRowsTask!=null) { var ready=await liveRowsTask.WaitAsync(ct); ct.ThrowIfCancellationRequested(); if(!ReferenceEquals(liveRows,ready)) { liveRows=ready; foreach(var row in liveRows) row.IsFavorite=settings.Profile.Favorites.Contains(row.Item.Id); UpdateNowNext(); } }
-            var search=channelSearch?.Text??""; var selected=filter; var rows=liveRows; var favorites=settings.Profile.Favorites.ToHashSet(); var history=new Dictionary<string,WatchState>(settings.Profile.History);
-            var matches=await Task.Run(()=> { IEnumerable<ChannelRow> found=rows.Where(r=>r.Item.Name.Contains(search,StringComparison.OrdinalIgnoreCase) && (selected=="All channels" || selected=="Favorites" && favorites.Contains(r.Item.Id) || selected=="Recently watched" && history.ContainsKey(r.Item.Id) || r.Item.Category==selected)); if(selected=="Recently watched") found=found.OrderByDescending(r=>history.GetValueOrDefault(r.Item.Id)?.Updated); return found.ToArray(); },ct);
+            var search=channelSearch?.Text??""; var selected=liveSelection; var rows=liveRows; var favorites=settings.Profile.Favorites.ToHashSet(); var history=new Dictionary<string,WatchState>(settings.Profile.History);
+            var matches=await Task.Run(()=> { IEnumerable<ChannelRow> found=rows.Where(r=>r.Item.Name.Contains(search,StringComparison.OrdinalIgnoreCase) && (selected.Scope==ChannelScope.All || selected.Scope==ChannelScope.Favorites && favorites.Contains(r.Item.Id) || selected.Scope==ChannelScope.Recent && history.ContainsKey(r.Item.Id) || selected.Scope==ChannelScope.Category && r.Item.SourceId==selected.SourceId && r.Item.Category==selected.Category)); if(selected.Scope==ChannelScope.Recent) found=found.OrderByDescending(r=>history.GetValueOrDefault(r.Item.Id)?.Updated); return found.ToArray(); },ct);
             if(ct.IsCancellationRequested || revision!=filterRevision || closed) return;
             if(channelList!.ItemsSource is not ChannelRow[] current || !current.SequenceEqual(matches)) channelList.ItemsSource=matches;
+            if(liveSummary!=null) liveSummary.Text=$"{selected.Title.ToUpperInvariant()} · {matches.Length:N0}";
         }
         catch(OperationCanceledException) { }
     }

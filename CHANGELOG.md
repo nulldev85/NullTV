@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-10-18
+
+- Dracula styling now includes pill navigation across the top, refined channel cards, shared quality badges and clearer Settings panels.
+- Guide has a fixed channel column, time-scaled program blocks, a scrolling six-hour timeline and a pink current-time line.
+- Expand or retract the IPTV category rail with its arrow. Browse Favorites, Recently watched, All channels and categories grouped by provider.
+- UHD/FHD/HD, frame-rate and HDR badges prefer measured stream information. Provider labels are identified in tooltips; unknown details stay unlabeled.
+- Guide playback stays in its compact preview, with program summaries, fading controls, fullscreen and Escape restoration.
+
 ## 0.5.5 — 2026-10-18
 
 - Player controls and stream details fade after inactivity and return with mouse, touch or keyboard activity.

@@ -80,6 +80,7 @@ public sealed class Profile
     public List<Source> Sources { get; set; } = [];
     public HashSet<string> Favorites { get; set; } = [];
     public List<string> FavoriteGuideOrder { get; set; } = [];
+    public Dictionary<string,StreamObservation> StreamObservations { get; set; } = [];
     public Dictionary<string, WatchState> History { get; set; } = [];
     public HashSet<string> LockedItems { get; set; } = [];
     public HashSet<string> LockedCategories { get; set; } = [];
@@ -107,7 +108,7 @@ public sealed class Settings
     public void Validate()
     {
         if (Schema != 1) throw new InvalidDataException("This settings version is newer than this app.");
-        if (Profiles is null || Playback is null || Appearance is null || Keymap is null || Profiles.Any(p=>p is null || p.Sources is null || p.Favorites is null || p.FavoriteGuideOrder is null || p.History is null || p.LockedItems is null || p.LockedCategories is null || p.Reminders is null)) throw new InvalidDataException("Settings contain invalid or missing fields.");
+        if (Profiles is null || Playback is null || Appearance is null || Keymap is null || Profiles.Any(p=>p is null || p.Sources is null || p.Favorites is null || p.FavoriteGuideOrder is null || p.StreamObservations is null || p.History is null || p.LockedItems is null || p.LockedCategories is null || p.Reminders is null)) throw new InvalidDataException("Settings contain invalid or missing fields.");
         if (Profiles.Count == 0) Profiles.Add(new());
         Playback.Volume = Math.Clamp(Playback.Volume, 0, 100);
         Playback.CacheSeconds = Math.Clamp(Playback.CacheSeconds, 1, 120);
