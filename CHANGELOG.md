@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.5 — 2026-10-18
+
+- Player controls and stream details fade after inactivity and return with mouse, touch or keyboard activity.
+- Fullscreen has a single exit-fullscreen control and an unobstructed video view; Escape restores the app.
+- Stream changes no longer wait for server progress reporting. Playback loads are serialized, and native player cleanup stays off the interface thread.
+- Refined navigation, lighter cards, aligned search/filter fields and a simpler Now Playing header give more room to the video.
+
 ## 0.5.4 — 2026-10-12
 
 - Media Servers now opens a dedicated server library view with catalog names/order, Continue Watching, Next Up, collections, search, genre filters and paging. Jellyfin/AIOStreams libraries that require a genre are populated using their offered All/first genre instead of showing a connected server with zero items.

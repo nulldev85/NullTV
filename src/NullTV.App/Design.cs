@@ -55,7 +55,7 @@ public sealed partial class MainWindow
     private static void PolishField(Control control,bool preserveTemplate=false)
     {
         if(!preserveTemplate) control.Style=(Style)Application.Current.Resources[control is ComboBox ? "NullTVComboBoxStyle" : control is PasswordBox ? "NullTVPasswordBoxStyle" : "NullTVTextBoxStyle"];
-        control.CornerRadius=new CornerRadius(10); control.FontSize=14; control.Padding=new Thickness(14,11,14,11); control.Background=FieldFill(); control.Foreground=FieldText(); control.BorderBrush=FieldStroke(); control.BorderThickness=new Thickness(1);
+        control.CornerRadius=new CornerRadius(8); control.FontSize=13; control.Padding=new Thickness(12,9,12,9); control.Background=FieldFill(); control.Foreground=FieldText(); control.BorderBrush=FieldStroke(); control.BorderThickness=new Thickness(.5);
         control.Resources["TextControlForeground"]=FieldText(); control.Resources["TextControlForegroundFocused"]=FieldText(); control.Resources["TextControlForegroundPointerOver"]=FieldText(); control.Resources["TextControlBackgroundFocused"]=FieldFill(); control.Resources["TextControlBorderBrushFocused"]=new SolidColorBrush(Color("#815CD6"));
         if(control is ComboBox combo)
         {
@@ -72,9 +72,9 @@ public sealed partial class MainWindow
         public event TextChangedEventHandler? TextChanged;
         public SearchField(string placeholder)
         {
-            MinHeight=46;
-            input=new TextBox { PlaceholderText=placeholder,MinHeight=46,VerticalContentAlignment=VerticalAlignment.Center,HorizontalContentAlignment=HorizontalAlignment.Stretch,TextAlignment=TextAlignment.Left };
-            PolishField(input); input.Padding=new Thickness(14,11,40,11);
+            MinHeight=42;
+            input=new TextBox { PlaceholderText=placeholder,MinHeight=42,VerticalContentAlignment=VerticalAlignment.Center,HorizontalContentAlignment=HorizontalAlignment.Stretch,TextAlignment=TextAlignment.Left };
+            PolishField(input); input.Padding=new Thickness(12,9,38,9);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(input,placeholder);
             Children.Add(input);
             var icon=new FontIcon { Glyph="\uE721",FontSize=14,Foreground=FieldText(),Opacity=.6,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,14,0),IsHitTestVisible=false }; Children.Add(icon);

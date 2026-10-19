@@ -26,6 +26,7 @@ public sealed class MpvPlayer : IDisposable
     public PlaybackState State=>state;
     public event Action? StateChanged;
     private readonly object gate=new();
+    private readonly SemaphoreSlim loadGate=new(1);
     private IntPtr handle;
     private readonly CancellationTokenSource lifetime=new();
     private readonly Task events;
@@ -86,6 +87,8 @@ public sealed class MpvPlayer : IDisposable
     public async Task PlayAsync(MediaItem item, double start=0,CancellationToken ct=default)
     {
         using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token,ct);
+        await loadGate.WaitAsync(request.Token);
+        try {
         var headers=string.Join(',',item.Headers.Where(h=>h.Key is "User-Agent" or "Referer").Select(h=>$"{h.Key}: {h.Value.Replace(",","%2C")}"));
         await SetAndWaitAsync("http-header-fields",headers,request.Token); await SetAndWaitAsync("pause","no",request.Token);
         await SetSubtitleAsync(preferences.SubtitlesEnabled ? "auto" : "no",request.Token);
@@ -94,6 +97,8 @@ public sealed class MpvPlayer : IDisposable
         // start=0 override. Reopening it drops a paused/backlogged cache.
         if(item.Kind==MediaKind.Live) Command("loadfile",item.Url,"replace");
         else Command("loadfile",item.Url,"replace","-1","start="+start.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        finally { loadGate.Release(); }
     }
     public async Task SetSubtitleAsync(string id,CancellationToken ct=default)
     {

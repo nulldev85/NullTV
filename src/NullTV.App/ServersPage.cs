@@ -10,12 +10,15 @@ public sealed partial class MainWindow
     {
         if(surface?.Player==null || playing==null) return;
         var s=settings.Profile.Sources.FirstOrDefault(s=>s.Id==playing.SourceId); if(s?.Kind is not (SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex)) return;
-        try { await new MediaServerClient(http).ProgressAsync(s,playing,surface.Player.Number("time-pos"),surface.Player.Number("duration"),true,lifetime.Token); } catch(Exception e) when(e is not OutOfMemoryException) { await log.WriteAsync("SERVER_SYNC_FAILED",e); }
+        var item=playing; var state=surface.Player.State;
+        using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); request.CancelAfter(TimeSpan.FromSeconds(8));
+        try { await new MediaServerClient(http).ProgressAsync(s,item,state.Position,state.Duration,true,request.Token); } catch(Exception e) when(e is not OutOfMemoryException) { if(!closed) await log.WriteAsync("SERVER_SYNC_FAILED",e); }
     }
     private async Task SyncServerProgressAsync()
     {
         if(!await serverSyncGate.WaitAsync(0)) return;
-        try { foreach(var (v,item) in active.ToArray()) { var s=settings.Profile.Sources.FirstOrDefault(s=>s.Id==item.SourceId); if(s?.Kind is not (SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex) || v.Player==null) continue; await new MediaServerClient(http).ProgressAsync(s,item,v.Player.Number("time-pos"),v.Player.Number("duration"),false,lifetime.Token); } }
+        using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); request.CancelAfter(TimeSpan.FromSeconds(8));
+        try { foreach(var (v,item) in active.ToArray()) { var s=settings.Profile.Sources.FirstOrDefault(s=>s.Id==item.SourceId); if(s?.Kind is not (SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex) || v.Player==null) continue; var state=v.Player.State; await new MediaServerClient(http).ProgressAsync(s,item,state.Position,state.Duration,false,request.Token); } }
         finally { serverSyncGate.Release(); }
     }
     private UIElement BuildServers()

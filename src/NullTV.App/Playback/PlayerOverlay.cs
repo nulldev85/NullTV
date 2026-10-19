@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using NullTV.Core;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Hosting;
@@ -36,18 +38,22 @@ public sealed class PlayerOverlay : IDisposable
     private readonly FrameworkElement controlContent,detailContent;
     private readonly Func<(VideoSurface? Video,bool Available)> current;
     private readonly Action focusBack;
-    private readonly DispatcherTimer hoverTimer=new() { Interval=TimeSpan.FromMilliseconds(120) };
+    private readonly DispatcherTimer hoverTimer=new() { Interval=TimeSpan.FromMilliseconds(50) };
+    private readonly Stopwatch clock=Stopwatch.StartNew();
+    private readonly PlaybackOverlayActivity activity=new();
+    private readonly Func<bool> reducedMotion;
+    private TimeSpan nextMeasure;
+    private byte alpha=210;
     private RectInt32 controlBounds,detailBounds;
-    private bool disposed,keyboardInteraction;
-    private DateTimeOffset revealUntil;
+    private bool disposed,keyboardInteraction,pointerDown;
     public bool IsVisible { get; private set; }
     private bool? compactLayout;
     private double availableWidth;
     public event Action<double,bool>? LayoutChanged;
     public event Action<bool>? VisibilityChanged;
-    public PlayerOverlay(Window owner,FrameworkElement controlContent,FrameworkElement detailContent,Func<(VideoSurface?,bool)> current,Action focusBack)
+    public PlayerOverlay(Window owner,FrameworkElement controlContent,FrameworkElement detailContent,Func<(VideoSurface?,bool)> current,Action focusBack,Func<bool> reducedMotion)
     {
-        this.owner=owner; this.current=current; this.focusBack=focusBack;
+        this.owner=owner; this.current=current; this.focusBack=focusBack; this.reducedMotion=reducedMotion;
         this.controlContent=controlContent; this.detailContent=detailContent;
         hwnd=WinRT.Interop.WindowNative.GetWindowHandle(owner);
         manager=WindowsXamlManager.InitializeForCurrentThread();
@@ -66,11 +72,13 @@ public sealed class PlayerOverlay : IDisposable
         Fade(controls); Fade(details);
         controls.SiteBridge.Hide(); details.SiteBridge.Hide();
         controls.TakeFocusRequested+=(_,_)=> { keyboardInteraction=false; focusBack(); };
-        controlContent.KeyDown+=(_,_)=>keyboardInteraction=true;
-        controlContent.PointerPressed+=(_,_)=>keyboardInteraction=false;
+        controlContent.AddHandler(UIElement.KeyDownEvent,new Microsoft.UI.Xaml.Input.KeyEventHandler((_,e)=> { if(e.Key==Windows.System.VirtualKey.Tab) keyboardInteraction=true; activity.Reveal(clock.Elapsed); }),true);
+        controlContent.AddHandler(UIElement.PointerPressedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,_)=> { keyboardInteraction=false; pointerDown=true; activity.Reveal(clock.Elapsed); }),true);
+        controlContent.AddHandler(UIElement.PointerReleasedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,_)=> { pointerDown=false; activity.Reveal(clock.Elapsed); }),true);
+        controlContent.AddHandler(UIElement.PointerCaptureLostEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,_)=>pointerDown=false),true);
         hoverTimer.Tick+=(_,_)=>Update(); hoverTimer.Start();
     }
-    public void Reveal() { revealUntil=DateTimeOffset.UtcNow.AddSeconds(3); Update(); }
+    public void Reveal() { activity.Reveal(clock.Elapsed); nextMeasure=default; Update(); }
     public void FocusControls()
     {
         keyboardInteraction=true; Reveal();
@@ -78,7 +86,11 @@ public sealed class PlayerOverlay : IDisposable
     }
     public void Hide()
     {
-        revealUntil=default; keyboardInteraction=false;
+        activity.Dismiss(); keyboardInteraction=false; pointerDown=false; HideWindows();
+    }
+    private void HideWindows()
+    {
+        if(!IsVisible) return;
         if(controls.HasFocus) focusBack();
         controls.SiteBridge.Hide(); details.SiteBridge.Hide(); var changed=IsVisible; IsVisible=false; if(changed) VisibilityChanged?.Invoke(false);
     }
@@ -89,17 +101,23 @@ public sealed class PlayerOverlay : IDisposable
         if(!available || bounds==null || !owner.AppWindow.IsVisible || IsIconic(hwnd)) { Hide(); return; }
         // XAML may deliver Unloaded from the old parent after a same-frame
         // reparent. The current, laid-out host is authoritative for HWND visibility.
-        video!.Hide(false);
+        if(video!.IsHidden) video.Hide(false);
         var rect=bounds.Value; var scale=(owner.Content as FrameworkElement)?.XamlRoot?.RasterizationScale??1;
         if(rect.Width<220*scale || rect.Height<160*scale) { Hide(); return; }
         GetCursorPos(out var screenPoint); var hit=WindowFromPoint(screenPoint); var point=screenPoint; ScreenToClient(hwnd,ref point);
         var over=GetAncestor(hit,2)==hwnd && point.X>=rect.X && point.X<rect.X+rect.Width && point.Y>=rect.Y && point.Y<rect.Y+rect.Height;
         var foreground=GetAncestor(GetForegroundWindow(),2)==hwnd;
-        var show=over || foreground && (DateTimeOffset.UtcNow<revealUntil || keyboardInteraction && controls.HasFocus);
-        if(!show) { if(IsVisible) Hide(); return; }
+        if(activity.ObservePointer(clock.Elapsed,screenPoint.X,screenPoint.Y,over && foreground)) keyboardInteraction=false;
+        var opacity=foreground ? activity.Opacity(clock.Elapsed,pointerDown || keyboardInteraction && controls.HasFocus,reducedMotion()) : 0;
+        if(opacity<=0) { HideWindows(); return; }
+        var targetAlpha=(byte)Math.Round(210*opacity);
+        if(alpha!=targetAlpha) { alpha=targetAlpha; foreach(var island in new[]{controls,details}) SetLayeredWindowAttributes(Win32Interop.GetWindowFromWindowId(island.SiteBridge.WindowId),0,alpha,2); }
         var compact=rect.Height/scale<340 || rect.Width/scale<500;
         var inset=(int)Math.Round(8*scale); var maxWidth=rect.Width/scale-16;
         if(compactLayout!=compact || Math.Abs(availableWidth-maxWidth)>.5) { compactLayout=compact; availableWidth=maxWidth; LayoutChanged?.Invoke(maxWidth,compact); }
+        var layoutChanged=rect!=videoBounds || clock.Elapsed>=nextMeasure || !IsVisible;
+        if(layoutChanged) {
+        videoBounds=rect; nextMeasure=clock.Elapsed+TimeSpan.FromMilliseconds(250);
         controlContent.Measure(new Size(maxWidth,double.PositiveInfinity));
         detailContent.Measure(new Size(Math.Min(compact ? 170 : 250,maxWidth),double.PositiveInfinity));
         var width=(int)Math.Ceiling(Math.Min(maxWidth,controlContent.DesiredSize.Width)*scale);
@@ -110,11 +128,13 @@ public sealed class PlayerOverlay : IDisposable
         var nextDetails=new RectInt32(rect.X+rect.Width-infoWidth-inset,rect.Y+inset,infoWidth,infoHeight);
         if(nextControls!=controlBounds) { controlBounds=nextControls; controls.SiteBridge.MoveAndResize(controlBounds); Round(controls,controlBounds,scale); }
         if(nextDetails!=detailBounds) { detailBounds=nextDetails; details.SiteBridge.MoveAndResize(detailBounds); Round(details,detailBounds,scale); }
+        }
         // A late native video resize can raise its child after XAML layout.
         // Reassert the overlay order while visible so controls never sit behind video.
-        controls.SiteBridge.MoveInZOrderAtTop(); details.SiteBridge.MoveInZOrderAtTop();
+        if(layoutChanged || !IsVisible) { controls.SiteBridge.MoveInZOrderAtTop(); details.SiteBridge.MoveInZOrderAtTop(); }
         if(!IsVisible) { controls.SiteBridge.Show(); details.SiteBridge.Show(); IsVisible=true; VisibilityChanged?.Invoke(true); }
     }
+    private RectInt32 videoBounds;
     private static void Round(DesktopWindowXamlSource source,RectInt32 bounds,double scale)
     {
         var radius=(int)Math.Round(16*scale); var region=CreateRoundRectRgn(0,0,bounds.Width+1,bounds.Height+1,radius,radius);

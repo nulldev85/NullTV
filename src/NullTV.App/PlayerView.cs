@@ -31,7 +31,8 @@ public sealed partial class MainWindow
         if(sidebar!=null) sidebar.Visibility=expanded || navigationHidden ? Visibility.Collapsed : Visibility.Visible;
         status.Visibility=expanded || currentTab=="Guide" ? Visibility.Collapsed : Visibility.Visible;
         pageHost.Margin=expanded ? new Thickness(0) : currentTab=="Guide" ? GuideMargin : new Thickness(28,18,28,20);
-        if(playerModeBar!=null) playerModeBar.Visibility=expanded ? Visibility.Visible : Visibility.Collapsed;
+        if(playerModeBar!=null) playerModeBar.Visibility=expandedVideo && !fullscreen ? Visibility.Visible : Visibility.Collapsed;
+        if(titlebarChrome!=null) titlebarChrome.Visibility=fullscreen ? Visibility.Collapsed : Visibility.Visible;
         if(exitPlayerView!=null) exitPlayerView.Content=currentTab=="Guide" ? "‹  Back to guide" : "‹  Back to player";
         UpdateCloseActions();
     }

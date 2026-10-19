@@ -27,6 +27,12 @@ public sealed partial class MainWindow
     private bool updatingTransport;
     private string emptyPlayerMode="";
     private readonly DispatcherTimer transportTimer=new() { Interval=TimeSpan.FromMilliseconds(250) };
+    private int transportUpdatePending;
+    private void QueueTransportUpdate()
+    {
+        if(Interlocked.Exchange(ref transportUpdatePending,1)!=0) return;
+        if(!DispatcherQueue.TryEnqueue(()=> { Interlocked.Exchange(ref transportUpdatePending,0); UpdatePlaybackControls(); })) Interlocked.Exchange(ref transportUpdatePending,0);
+    }
     private void ActivateTransport()
     {
         // Replay belongs to the visible empty-state action. A hidden overlay
@@ -45,12 +51,13 @@ public sealed partial class MainWindow
     }
     private void UpdatePlaybackControls()
     {
-        if(primaryTransport==null || closed) return;
+        if(primaryTransport==null || closed || closingInProgress) return;
         var item=playing??lastPlayed; var state=surface?.Player?.State; var running=playing!=null && state?.Idle==false; var live=item?.Kind==MediaKind.Live;
         LabelButton(primaryTransport,running && !state!.Paused ? "\uE769" : "\uE768",running && !state!.Paused ? "Pause" : "Play");
         primaryTransport.IsEnabled=playing!=null;
         UpdateCloseActions();
         LabelButton(expandButton,expandedVideo || fullscreen ? "\uE73F" : "\uE8A7",expandedVideo || fullscreen ? "Restore app view" : "Expand video in window");
+        if(expandButton!=null) expandButton.Visibility=fullscreen ? Visibility.Collapsed : Visibility.Visible;
         LabelButton(fullscreenButton,fullscreen ? "\uE73F" : "\uE740",fullscreen ? "Exit fullscreen" : "Fullscreen");
         if(previousButton!=null) previousButton.Visibility=item?.Kind==MediaKind.Live && !compactVideoControls ? Visibility.Visible : Visibility.Collapsed;
         if(nextButton!=null) nextButton.Visibility=item?.Kind==MediaKind.Live && !compactVideoControls ? Visibility.Visible : Visibility.Collapsed;
@@ -58,9 +65,9 @@ public sealed partial class MainWindow
         if(forwardButton!=null) { forwardButton.Visibility=live ? Visibility.Collapsed : Visibility.Visible; forwardButton.IsEnabled=running && state?.Duration>0; }
         if(liveBar!=null) liveBar.Visibility=playing!=null && live ? Visibility.Visible : Visibility.Collapsed;
         if(live && running && state!.Paused) behindLive=true;
-        if(livePositionLabel!=null) { livePositionLabel.Text=state?.Paused==true ? "Paused · Select LIVE to return" : behindLive ? "Behind live · Select LIVE to return" : state?.Buffering==true ? "Buffering live feed…" : "Watching live"; livePositionLabel.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(behindLive ? "#F1FA8C" : "#F8F8F2")); }
-        if(subtitlesButton!=null) { subtitlesButton.IsEnabled=running; subtitlesButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(state?.SubtitlesVisible==true && state.SubtitleId is not ("no" or "") ? "#BD93F9" : "#F8F8F2")); }
-        var favorite=item!=null && settings.Profile.Favorites.Contains(item.Id); LabelButton(favoriteButton,favorite ? "\uE735" : "\uE734",favorite ? "Remove from favorites" : "Add to favorites"); if(favoriteButton!=null) { favoriteButton.IsEnabled=item!=null; favoriteButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? "#F1FA8C" : "#F8F8F2")); }
+        if(livePositionLabel!=null) { livePositionLabel.Text=state?.Paused==true ? "Paused · Go live" : behindLive ? "Behind live · Go live" : state?.Buffering==true ? "Buffering…" : "Watching live"; if((string?)livePositionLabel.Tag!=(behindLive ? "behind" : "live")) { livePositionLabel.Tag=behindLive ? "behind" : "live"; livePositionLabel.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(behindLive ? "#F1FA8C" : "#F8F8F2")); } }
+        if(subtitlesButton!=null) { subtitlesButton.IsEnabled=running; var enabled=state?.SubtitlesVisible==true && state.SubtitleId is not ("no" or ""); if(subtitlesButton.Tag is not bool previous || previous!=enabled) { subtitlesButton.Tag=enabled; subtitlesButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(enabled ? "#BD93F9" : "#F8F8F2")); } }
+        var favorite=item!=null && settings.Profile.Favorites.Contains(item.Id); LabelButton(favoriteButton,favorite ? "\uE735" : "\uE734",favorite ? "Remove from favorites" : "Add to favorites"); if(favoriteButton!=null) { favoriteButton.IsEnabled=item!=null; if(favoriteButton.Tag is not bool previous || previous!=favorite) { favoriteButton.Tag=favorite; favoriteButton.Foreground=new Microsoft.UI.Xaml.Media.SolidColorBrush(Color(favorite ? "#F1FA8C" : "#F8F8F2")); } }
         LabelButton(muteButton,state?.Muted==true ? "\uE74F" : "\uE767",state?.Muted==true ? "Unmute" : "Mute");
         if(progressArea!=null) progressArea.Visibility=playing!=null && !live && state?.Duration>0 ? Visibility.Visible : Visibility.Collapsed;
         if(state!=null)

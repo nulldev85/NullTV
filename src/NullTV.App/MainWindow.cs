@@ -24,7 +24,9 @@ public sealed partial class MainWindow : Window
     private List<MediaItem> items=[];
     private readonly Grid root=new() { Background=new SolidColorBrush(Color("#282A36")),RequestedTheme=ElementTheme.Dark };
     private readonly Grid pageHost=new();
-    private readonly StackPanel navigation=new() { Orientation=Orientation.Vertical, Spacing=6 };
+    private readonly StackPanel navigation=new() { Orientation=Orientation.Vertical, Spacing=3 };
+    private Grid? titlebarChrome;
+    private readonly PlayerKeyboardRouter nativeKeyboard;
     private Border? sidebar;
     private readonly TextBlock status=new() { Text="Starting NullTV…", TextWrapping=TextWrapping.Wrap, FontSize=12, Opacity=.75 };
     private readonly TextBlock profileLabel=new();
@@ -35,8 +37,10 @@ public sealed partial class MainWindow : Window
     private readonly DispatcherTimer timer=new() { Interval=TimeSpan.FromSeconds(1) };
     private int ticks;
     private bool busy;
+    private bool sourcesInitialized;
     private bool closed;
     private bool closingConfirmed;
+    private bool closingInProgress;
     private ImageCache? imageCache;
     private DateTimeOffset lastInput=DateTimeOffset.UtcNow;
     private DateTimeOffset unlockedUntil;
@@ -53,7 +57,7 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar=true;
         root.RowDefinitions.Add(new() { Height=new(58) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto }); root.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height=GridLength.Auto });
         root.ColumnDefinitions.Add(new() { Width=new(184) }); root.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
-        var titlebar=new Grid { Padding=new Thickness(16,0,150,0) }; titlebar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); titlebar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
+        var titlebar=new Grid { Padding=new Thickness(16,0,150,0) }; titlebarChrome=titlebar; titlebar.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); titlebar.ColumnDefinitions.Add(new() { Width=GridLength.Auto });
         var brand=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,VerticalAlignment=VerticalAlignment.Center };
         navigationToggle=IconButton("\uE700","Hide navigation",ToggleNavigation); navigationToggle.Width=navigationToggle.Height=navigationToggle.MinHeight=32; ((FontIcon)navigationToggle.Content).FontSize=15; brand.Children.Add(navigationToggle);
         brand.Children.Add(new Border { Width=28,Height=28,CornerRadius=new CornerRadius(8),Background=new SolidColorBrush(Color("#BD93F9")),Child=new TextBlock { Text="N",FontSize=16,FontWeight=Microsoft.UI.Text.FontWeights.Bold,Foreground=new SolidColorBrush(Color("#21222C")),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center } });
@@ -62,13 +66,20 @@ public sealed partial class MainWindow : Window
         Grid.SetColumnSpan(titlebar,2); root.Children.Add(titlebar); SetTitleBar(titlebar);
         titlebar.Loaded+=(_,_)=>UpdateNavigationHitRegion();
         root.LayoutUpdated+=(_,_)=>UpdateNavigationHitRegion();
-        navigation.Margin=new Thickness(12,20,12,0);
+        navigation.Margin=new Thickness(12,16,12,0);
         var label=Text("LIBRARY",10); label.CharacterSpacing=150; label.Opacity=.4; label.Margin=new Thickness(14,0,0,16); navigation.Children.Add(label);
         var names=new[] { "Live TV","Guide","Movies & Series","Now Playing","Media Servers","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE768","\uE968","\uE713" };
-        for(int i=0;i<names.Length;i++) { var name=names[i]; var b=Button(name,()=>Navigate(name)); b.Tag=name; b.Content=new StackPanel { Orientation=Orientation.Horizontal,Spacing=12,Children={ new FontIcon { Glyph=glyphs[i],FontSize=17 },new TextBlock { Text=name=="Movies & Series" ? "Movies & series" : name,FontSize=13,VerticalAlignment=VerticalAlignment.Center } } }; b.HorizontalAlignment=HorizontalAlignment.Stretch; b.HorizontalContentAlignment=HorizontalAlignment.Left; b.Padding=new Thickness(14,12,10,12); b.MinHeight=48; navigation.Children.Add(b); }
+        for(int i=0;i<names.Length;i++) {
+            var name=names[i]; var b=Button(name,()=>Navigate(name)); b.Tag=name;
+            var item=new Grid { ColumnSpacing=11 }; item.ColumnDefinitions.Add(new() { Width=new(2) }); item.ColumnDefinitions.Add(new() { Width=new(18) }); item.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
+            Place(item,new Border { Width=2,Height=18,CornerRadius=new CornerRadius(1),Background=new SolidColorBrush(Color("#BD93F9")),Opacity=0 });
+            Place(item,new FontIcon { Glyph=glyphs[i],FontSize=16 },0,1);
+            Place(item,new TextBlock { Text=name=="Movies & Series" ? "Movies & series" : name,FontSize=13,VerticalAlignment=VerticalAlignment.Center },0,2);
+            b.Content=item; b.HorizontalAlignment=HorizontalAlignment.Stretch; b.HorizontalContentAlignment=HorizontalAlignment.Stretch; b.Padding=new Thickness(8,10,10,10); b.MinHeight=44; navigation.Children.Add(b);
+        }
         var rail=new Grid(); rail.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); rail.RowDefinitions.Add(new() { Height=GridLength.Auto }); Place(rail,navigation);
         var railFooter=Stack(Text("YOUR SCREEN.\nYOUR SOURCES.",10)); railFooter.Opacity=.35; railFooter.Margin=new Thickness(26,16,16,24); Place(rail,railFooter,1);
-        sidebar=new Border { BorderThickness=new Thickness(0,0,1,0),BorderBrush=new SolidColorBrush(Color("#44475A")),Child=rail }; Place(root,sidebar,2);
+        sidebar=new Border { BorderThickness=new Thickness(0,0,.5,0),BorderBrush=new SolidColorBrush(Color("#44475A")),Child=rail }; Place(root,sidebar,2);
         BuildPlayerModeBar();
         pageHost.Margin=new Thickness(28,18,28,20); Place(root,pageHost,2,1);
         status.Margin=new Thickness(28,0,28,14); status.FontSize=11; status.Opacity=.45; Place(root,status,3,1);
@@ -77,10 +88,24 @@ public sealed partial class MainWindow : Window
         root.PointerMoved+=(_,_)=>lastInput=DateTimeOffset.UtcNow;
         root.SizeChanged+=(_,_)=>UpdateLiveLayout();
         Content=root;
+        nativeKeyboard=new(this,key=> {
+            if(closed || closingInProgress || dialogDepth>0 || !IsPlayerVisible) return false;
+            if(key==VirtualKey.Escape && (fullscreen || expandedVideo)) { ExitCurrentPlayerMode(); return true; }
+            return HandlePlayerKey(key,null,true);
+        },ReportUnhandled);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1440,960));
         AppWindow.Changed+=(_,_)=> { foreach(var tile in surfaces) tile.Hide(!IsPlayerVisible || !AppWindow.IsVisible || dialogDepth>0 || !active.ContainsKey(tile)); };
-        Closed+=(_,_)=> { closed=true; lifetime.Cancel(); timer.Stop(); transportTimer.Stop(); filterPending?.Cancel(); playerOverlay?.Dispose(); foreach(var s in surfaces) s.Dispose(); pipWindow?.Close(); _=store.SaveAsync(settings); http.Dispose(); updateHttp.Dispose(); };
-        AppWindow.Closing+=async (_,e)=> { if(closingConfirmed) { playerOverlay?.Dispose(); return; } e.Cancel=true; timer.Stop(); await GuardAsync(SaveProgressAsync); closingConfirmed=true; Close(); };
+        Closed+=(_,_)=> { closed=true; nativeKeyboard.Dispose(); lifetime.Cancel(); timer.Stop(); transportTimer.Stop(); filterPending?.Cancel(); playerOverlay?.Dispose(); foreach(var s in surfaces) s.Dispose(); pipWindow?.Close(); _=store.SaveAsync(settings); http.Dispose(); updateHttp.Dispose(); };
+        AppWindow.Closing+=async (_,e)=> {
+            if(closingConfirmed) return;
+            e.Cancel=true; if(closingInProgress) return; closingInProgress=true;
+            timer.Stop(); transportTimer.Stop(); playbackRequest?.Cancel();
+            foreach(var video in surfaces) CancelStreamRequest(video);
+            await GuardAsync(SaveProgressAsync); playerOverlay?.Dispose();
+            foreach(var video in surfaces) video.Dispose();
+            await GuardAsync(()=>Task.WhenAll(surfaces.Select(video=>video.Shutdown)));
+            closingConfirmed=true; Close();
+        };
         root.Loaded+=async (_,_)=>await GuardAsync(InitializeAsync);
         timer.Tick+=async (_,_)=>await TickAsync();
     }
@@ -142,10 +167,10 @@ public sealed partial class MainWindow : Window
     private void ValidationStep(string code) { if(!Environment.GetCommandLineArgs().Contains("--smoke-tab")) return; Directory.CreateDirectory(store.DirectoryPath); File.AppendAllText(Path.Combine(store.DirectoryPath,"validation.log"),code+"\n"); }
     private static string Friendly(Exception e) => e is InvalidDataException ? e.Message : e is HttpRequestException ? "The server could not be reached. Check the address and connection; cached channels remain available." : e is IOException ? "The file could not be read or written. Check its location and permissions." : e is System.Security.Cryptography.CryptographicException ? "The password is incorrect, or this encrypted file is damaged." : "The operation failed. Export Diagnostics for its error type; credentials are excluded.";
     private TextBlock Text(string value,int size=14) => new() { Text=value,FontSize=size*settings.Appearance.FontScale,TextWrapping=TextWrapping.Wrap };
-    private Border Card(UIElement content,Thickness? padding=null) => new() { Background=new SolidColorBrush(Color(SurfaceHex)),BorderBrush=new SolidColorBrush(Color(BorderHex)),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(16),Padding=padding??new Thickness(24),Child=content };
+    private Border Card(UIElement content,Thickness? padding=null) => new() { Background=new SolidColorBrush(Color(SurfaceHex)),BorderBrush=new SolidColorBrush(Color(BorderHex)),BorderThickness=new Thickness(.5),CornerRadius=new CornerRadius(12),Padding=padding??new Thickness(20),Child=content };
     private Button Primary(string label,Func<Task> action) { var b=AsyncButton(label,action); b.Background=new SolidColorBrush(Color(settings.Appearance.Accent)); b.Foreground=new SolidColorBrush(Color("#0A0A0A")); b.BorderBrush=b.Background; b.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; return b; }
     private Button IconButton(string glyph,string label,Action action) { var b=Button("",action); b.Content=new FontIcon { Glyph=glyph,FontSize=17 }; b.Width=44; b.Padding=new Thickness(0); b.Background=new SolidColorBrush(Microsoft.UI.Colors.Transparent); b.BorderBrush=b.Background; ToolTipService.SetToolTip(b,label); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b,label); return b; }
-    private Grid Heading(string title,string subtitle,UIElement? action=null) { var g=new Grid { Margin=new Thickness(0,0,0,24),ColumnSpacing=24 }; g.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); g.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); var h=Text(title,30); h.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; var s=Text(subtitle,12); s.Opacity=.5; var p=Stack(h,s); p.Spacing=6; Place(g,p); if(action!=null) { action.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center); Place(g,action,0,1); } return g; }
+    private Grid Heading(string title,string subtitle,UIElement? action=null) { var g=new Grid { Margin=new Thickness(0,0,0,16),ColumnSpacing=20 }; g.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); g.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); var h=Text(title,28); h.FontWeight=Microsoft.UI.Text.FontWeights.SemiBold; h.TextWrapping=TextWrapping.NoWrap; h.TextTrimming=TextTrimming.CharacterEllipsis; var s=Text(subtitle,12); s.Opacity=.65; s.TextWrapping=TextWrapping.NoWrap; s.TextTrimming=TextTrimming.CharacterEllipsis; var p=Stack(h,s); p.Spacing=5; p.VerticalAlignment=VerticalAlignment.Center; Place(g,p); if(action!=null) { action.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center); Place(g,action,0,1); } return g; }
     private UIElement EmptyState(string glyph,string title,string description,string action,Func<Task> handler)
     {
         var icon=new FontIcon { Glyph=glyph,FontSize=30,Foreground=new SolidColorBrush(Color(settings.Appearance.Accent)) };
@@ -158,7 +183,7 @@ public sealed partial class MainWindow : Window
     private StackPanel Stack(params UIElement[] children) { var p=new StackPanel { Spacing=12 }; foreach(var c in children) p.Children.Add(c); return p; }
     private static void Place(Grid g,UIElement c,int row=0,int col=0) { Grid.SetRow((FrameworkElement)c,row); Grid.SetColumn((FrameworkElement)c,col); g.Children.Add(c); }
     private static TextBox Field(string label,string value="") { var field=new TextBox { Header=label,Text=value,MinHeight=68 }; PolishField(field); return field; }
-    private static ComboBox Choice(string label,IEnumerable<string> values,string selected) { var c=new ComboBox { Header=string.IsNullOrWhiteSpace(label) ? null : label,MinHeight=string.IsNullOrWhiteSpace(label) ? 46 : 68,HorizontalAlignment=HorizontalAlignment.Stretch }; PolishField(c); foreach(var v in values) c.Items.Add(v); c.SelectedItem=selected; if(c.SelectedIndex<0 && c.Items.Count>0) c.SelectedIndex=0; return c; }
+    private static ComboBox Choice(string label,IEnumerable<string> values,string selected) { var c=new ComboBox { Header=string.IsNullOrWhiteSpace(label) ? null : label,MinHeight=string.IsNullOrWhiteSpace(label) ? 42 : 64,HorizontalAlignment=HorizontalAlignment.Stretch }; PolishField(c); foreach(var v in values) c.Items.Add(v); c.SelectedItem=selected; if(c.SelectedIndex<0 && c.Items.Count>0) c.SelectedIndex=0; return c; }
     private static ToggleSwitch Toggle(string label,bool value) => new() { Header=label,IsOn=value,MinHeight=44 };
     private ScrollViewer Scroll(UIElement element) => new() { Content=element,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
     private void Navigate(string tab)
@@ -174,7 +199,7 @@ public sealed partial class MainWindow : Window
         }
         if(currentTab!="Guide" && tab!=currentTab) { if(fullscreen) ToggleFullscreen(); if(expandedVideo) ToggleExpandedVideo(); }
         currentTab=tab; UpdatePlayerChrome(); playerOverlay?.Hide(); foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s));
-        foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .65; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); }
+        foreach(var b in navigation.Children.OfType<Button>()) { var selected=(string)b.Tag==tab; b.Opacity=selected ? 1 : .72; b.Background=new SolidColorBrush(selected ? Color(RaisedHex) : Colors.Transparent); b.BorderBrush=new SolidColorBrush(Colors.Transparent); b.Foreground=new SolidColorBrush(selected ? Color(settings.Appearance.Accent) : settings.Appearance.Theme=="Light" ? Colors.Black : Color("#F8F8F2")); if(b.Content is Grid item) { item.Children[0].Opacity=selected ? 1 : 0; ((TextBlock)item.Children[2]).FontWeight=selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal; } }
         foreach(var child in pageHost.Children) child.Visibility=Visibility.Collapsed;
         if(tab is "Live TV" or "Now Playing") { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s)); UpdateLiveLayout(); return; }
         // Other pages are rebuilt to reflect profile and settings changes.
@@ -188,7 +213,7 @@ public sealed partial class MainWindow : Window
         if(!await refreshGate.WaitAsync(0)) return;
         try
         {
-            busy=true;
+            busy=true; var changed=false; var failed=false;
             foreach(var s in settings.Profile.Sources.Where(s=>s.Kind is SourceKind.Xtream or SourceKind.PlaylistFile or SourceKind.PlaylistUrl))
             {
                 if(!force && catalogs.TryGetValue(s.Id,out var existing) && DateTimeOffset.UtcNow-s.LastRefresh<TimeSpan.FromHours(s.RefreshHours))
@@ -196,10 +221,16 @@ public sealed partial class MainWindow : Window
                     if(!epgs.ContainsKey(s.Id)) await GuardAsync(async ()=> { var cached=await store.LoadGuideAsync(s.Id); var guide=cached?.Any(p=>p.End>DateTimeOffset.UtcNow) == true ? cached : await Task.Run(()=>new SourceService(http,store).LoadEpgAsync(s,existing,lifetime.Token)); epgs[s.Id]=guide; await IndexGuidesAsync(); UpdateNowNext(); if(!ReferenceEquals(guide,cached)) await store.SaveGuideAsync(s.Id,guide); });
                     continue;
                 }
-                await GuardAsync(async ()=> { status.Text=$"Refreshing {s.Name}…"; var service=new SourceService(http,store); var catalog=await Task.Run(()=>service.RefreshAsync(s,lifetime.Token)); catalogs[s.Id]=catalog; RebuildItems(); await store.SaveAsync(settings); try { epgs[s.Id]=await Task.Run(()=>service.LoadEpgAsync(s,catalog,lifetime.Token)); await IndexGuidesAsync(); UpdateNowNext(); await store.SaveGuideAsync(s.Id,epgs[s.Id]); } catch(Exception e) { status.Text="Channels loaded. EPG unavailable; set an XMLTV override in Sources."; await log.WriteAsync("EPG_FAILED",e); } });
+                var loaded=false;
+                await GuardAsync(async ()=> { status.Text=$"Refreshing {s.Name}…"; var service=new SourceService(http,store); var catalog=await Task.Run(()=>service.RefreshAsync(s,lifetime.Token)); catalogs[s.Id]=catalog; changed=loaded=true; RebuildItems(); await store.SaveAsync(settings); try { epgs[s.Id]=await Task.Run(()=>service.LoadEpgAsync(s,catalog,lifetime.Token)); await IndexGuidesAsync(); UpdateNowNext(); await store.SaveGuideAsync(s.Id,epgs[s.Id]); } catch(Exception e) { failed=true; status.Text="Channels loaded. EPG unavailable; set an XMLTV override in Sources."; await log.WriteAsync("EPG_FAILED",e); } });
+                failed|=!loaded;
             }
-            UpdateLive(); if(!settings.Profile.Sources.Any()) status.Text="Welcome. Add your provider or playlist in Settings → Sources to get started.";
-            else status.Text=$"{items.Count:N0} items · {settings.Profile.Sources.Count} sources · {epgs.Values.Sum(x=>x.Count):N0} guide programs";
+            if(changed || force || !sourcesInitialized)
+            {
+                UpdateLive();
+                if(!failed && playing==null) status.Text=!settings.Profile.Sources.Any() ? "Welcome. Add your provider or playlist in Settings → Sources to get started." : $"{items.Count:N0} items · {settings.Profile.Sources.Count} sources · {epgs.Values.Sum(x=>x.Count):N0} guide programs";
+                sourcesInitialized=true;
+            }
         }
         finally { busy=false; refreshGate.Release(); }
     }

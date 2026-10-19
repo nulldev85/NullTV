@@ -9,6 +9,7 @@ void Test(string name,Func<Task> test)=>tests.Add((name,test));
 void Check(bool condition,string message="Assertion failed") { if(!condition) throw new Exception(message); }
 UpdateTests.Register(Test,Check);
 ServerLibraryTests.Register(Test,Check);
+PlaybackOverlayTests.Register(Test,Check);
 async Task<List<MediaItem>> Parse(string text,M3uParser? parser=null) { var result=new List<MediaItem>(); await foreach(var item in (parser??new()).ParseAsync(new StringReader(text),"fixture")) result.Add(item); return result; }
 Test("M3U quoted attributes, comma and BOM",async ()=> { var p=new M3uParser(); var list=await Parse("\uFEFF#EXTM3U x-tvg-url=\"https://fixture.invalid/epg\"\n#EXTINF:-1 tvg-id=\"id\" group-title=\"A, B\" tvg-logo=\"https://fixture.invalid/icon\",Channel, one\nhttps://fixture.invalid/a.m3u8",p); Check(list.Count==1 && list[0].Name=="Channel, one" && list[0].Category=="A, B" && list[0].EpgId=="id" && p.EpgUrl.EndsWith("/epg")); });
 Test("M3U VLC and Kodi headers",async ()=> { var list=await Parse("#EXTM3U\n#EXTINF:-1,Test\n#EXTVLCOPT:http-user-agent=NullTV\n#KODIPROP:inputstream.adaptive.stream_headers=Referer=https%3A%2F%2Ffixture.invalid&User-Agent=Agent%20X\nhttps://fixture.invalid/x"); Check(list[0].Headers["User-Agent"]=="Agent X" && list[0].Headers["Referer"]=="https://fixture.invalid"); });
