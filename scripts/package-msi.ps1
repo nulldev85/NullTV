@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$PublishDirectory,[string]$InstallerVersion='0.6.2')
+param([Parameter(Mandatory)][string]$PublishDirectory,[string]$InstallerVersion='0.7.0')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $publish=(Resolve-Path -LiteralPath $PublishDirectory).Path

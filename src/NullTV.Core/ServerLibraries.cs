@@ -29,7 +29,7 @@ public sealed partial class MediaServerClient
     }
     public async Task<ServerPage> LibraryPageAsync(Source source,string parentId,string libraryName,string genre,string search,string sort,int start,CancellationToken ct)
     {
-        var path=$"Users/{Uri.EscapeDataString(source.UserId)}/Items?ParentId={Uri.EscapeDataString(parentId)}&Recursive=false&IncludeItemTypes=Movie,Series,BoxSet,Folder,CollectionFolder,Season,Episode,Video&Fields=Overview,ParentId&Limit=60&StartIndex={Math.Max(0,start)}&EnableTotalRecordCount=true";
+        var path=$"Users/{Uri.EscapeDataString(source.UserId)}/Items?ParentId={Uri.EscapeDataString(parentId)}&Recursive=false&IncludeItemTypes=Movie,Series,BoxSet,Folder,CollectionFolder,Season,Episode,Video&Fields=Overview,ParentId,ProviderIds&Limit=60&StartIndex={Math.Max(0,start)}&EnableTotalRecordCount=true";
         if(genre!="") path+="&Genres="+Uri.EscapeDataString(genre);
         if(search!="") path+="&SearchTerm="+Uri.EscapeDataString(search);
         if(sort=="Title A–Z") path+="&SortBy=SortName&SortOrder=Ascending";
@@ -82,7 +82,7 @@ public sealed partial class MediaServerClient
             var start=0; var seen=new HashSet<string>();
             while(start<100_000)
             {
-                using var response=await JsonAsync(source,$"Users/{user}/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=Overview&Limit=200&StartIndex={start}",ct);
+                using var response=await JsonAsync(source,$"Users/{user}/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=Overview,ProviderIds&Limit=200&StartIndex={start}",ct);
                 var entries=Entries(response.RootElement).ToArray(); var added=0;
                 foreach(var entry in entries) { var item=Item(source,entry); ReadUserData(entry,item,history); if(seen.Add(item.Id)) { items.Add(item); added++; } }
                 start+=entries.Length;

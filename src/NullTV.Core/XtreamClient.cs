@@ -69,9 +69,9 @@ public sealed class XtreamClient(HttpClient http)
                 {
                     var id = Text(e,"id"); if (id == "") continue;
                     var ext = SafeExtension(Text(e,"container_extension"));
-                    episodes.Add(new($"{s.Id}:Episode:{id}", s.Id, $"S{season.Name} · E{Text(e,"episode_num")} · {Text(e,"title")}", item.Name, MediaKind.Episode, StreamUrl(s, MediaKind.Episode, id, ext)) { ProviderId=id, Extension=ext });
+                    episodes.Add(new($"{s.Id}:Episode:{id}", s.Id, $"S{season.Name} · E{Text(e,"episode_num")} · {Text(e,"title")}", item.Name, MediaKind.Episode, StreamUrl(s, MediaKind.Episode, id, ext)) { ProviderId=id, Extension=ext,Season=int.TryParse(season.Name,out var seasonNumber) ? seasonNumber : null,Episode=int.TryParse(Text(e,"episode_num"),out var episodeNumber) ? episodeNumber : null });
                 }
-        return new(Text(info,"plot"), Text(info,"cast"), Text(info,"rating"), episodes);
+        return new(Text(info,"plot"), Text(info,"cast"), Text(info,"rating"), episodes) { ContentId=AddonIdentity.Imdb(Text(info,"imdb_id")),Year=Text(info,"releasedate") is { Length:>=4 } released ? released[..4] : "" };
     }
     public async Task<List<Programme>> EpgAsync(Source s, MediaItem item, bool full, CancellationToken ct = default)
     {

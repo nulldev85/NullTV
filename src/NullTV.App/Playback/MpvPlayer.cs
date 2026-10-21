@@ -21,6 +21,8 @@ public sealed class MpvPlayer : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct Event { public int Id,Error; public ulong Reply; public IntPtr Data; }
     [StructLayout(LayoutKind.Sequential)] private struct End { public int Reason,Error; public long Entry; public long Insert; public int Count; }
     [StructLayout(LayoutKind.Sequential)] private struct Property { public IntPtr Name; public int Format; public IntPtr Data; }
+    [StructLayout(LayoutKind.Sequential)] private struct Node { public IntPtr Value; public int Format; }
+    [StructLayout(LayoutKind.Sequential)] private struct NodeList { public int Count; public IntPtr Values,Keys; }
     public sealed record PlaybackState(bool Paused=false,bool Idle=true,bool Buffering=false,bool Muted=false,double Position=0,double Duration=0,double Volume=75,bool SubtitlesVisible=false,string SubtitleId="no");
     private volatile PlaybackState state=new();
     public PlaybackState State=>state;
@@ -71,6 +73,32 @@ public sealed class MpvPlayer : IDisposable
         try { ct.ThrowIfCancellationRequested(); if(QueueProperty(name,value,id)<0) throw new InvalidOperationException("Playback property could not be queued."); if(await completion.Task.WaitAsync(TimeSpan.FromSeconds(15),ct)<0) throw new InvalidOperationException("Playback property could not be applied."); }
         finally { replies.TryRemove(id,out _); }
     }
+    private async Task SetHeadersAsync(Dictionary<string,string> headers,CancellationToken ct)
+    {
+        // A native string array preserves commas in Cookie/Authorization values.
+        // It also replaces the entire previous stream's header list, even when empty.
+        var values=headers.Where(pair=>System.Text.RegularExpressions.Regex.IsMatch(pair.Key,@"^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,80}$") && !pair.Value.Any(c=>c is '\r' or '\n' or '\0')).Take(32).Select(pair=>pair.Key+": "+pair.Value).ToArray();
+        var id=(ulong)Interlocked.Increment(ref nextRequest); var completion=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously); replies[id]=completion;
+        try {
+            ct.ThrowIfCancellationRequested();
+            lock(gate)
+            {
+                if(handle==IntPtr.Zero) throw new ObjectDisposedException(nameof(MpvPlayer));
+                var strings=values.Select(Marshal.StringToCoTaskMemUTF8).ToArray(); var nodes=Marshal.AllocHGlobal(Math.Max(1,strings.Length)*Marshal.SizeOf<Node>()); var list=Marshal.AllocHGlobal(Marshal.SizeOf<NodeList>()); var root=Marshal.AllocHGlobal(Marshal.SizeOf<Node>());
+                try {
+                    for(var n=0;n<strings.Length;n++) Marshal.StructureToPtr(new Node { Value=strings[n],Format=1 },IntPtr.Add(nodes,n*Marshal.SizeOf<Node>()),false);
+                    Marshal.StructureToPtr(new NodeList { Count=strings.Length,Values=nodes },list,false); Marshal.StructureToPtr(new Node { Value=list,Format=7 },root,false);
+                    if(mpv_set_property_async(handle,id,"http-header-fields",6,root)<0) throw new InvalidOperationException("Playback headers could not be queued.");
+                } finally { foreach(var text in strings) Marshal.FreeCoTaskMem(text); Marshal.FreeHGlobal(nodes); Marshal.FreeHGlobal(list); Marshal.FreeHGlobal(root); }
+            }
+            if(await completion.Task.WaitAsync(TimeSpan.FromSeconds(15),ct)<0) throw new InvalidOperationException("Playback headers could not be applied.");
+        } finally { replies.TryRemove(id,out _); }
+    }
+    public void AddSuppliedSubtitles(IEnumerable<MediaSubtitle> subtitles)
+    {
+        foreach(var subtitle in subtitles.Take(32)) if(Uri.TryCreate(subtitle.Url,UriKind.Absolute,out var uri) && uri.Scheme is "http" or "https") Command("sub-add",uri.AbsoluteUri,"auto",subtitle.Language,subtitle.Language);
+        Set("sub-visibility",preferences.SubtitlesEnabled ? "yes" : "no"); if(!preferences.SubtitlesEnabled) Set("sid","no");
+    }
     public string Get(string name) { lock(gate) { if(handle==IntPtr.Zero) return ""; var p=mpv_get_property_string(handle,name); if(p==IntPtr.Zero) return ""; try { return Marshal.PtrToStringUTF8(p)??""; } finally { mpv_free(p); } } }
     public double Number(string name) => double.TryParse(Get(name),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var d) ? d : 0;
     public void Command(params string[] args)=>QueueCommand(args,0);
@@ -89,8 +117,7 @@ public sealed class MpvPlayer : IDisposable
         using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token,ct);
         await loadGate.WaitAsync(request.Token);
         try {
-        var headers=string.Join(',',item.Headers.Where(h=>h.Key is "User-Agent" or "Referer").Select(h=>$"{h.Key}: {h.Value.Replace(",","%2C")}"));
-        await SetAndWaitAsync("http-header-fields",headers,request.Token); await SetAndWaitAsync("pause","no",request.Token);
+        await SetHeadersAsync(item.Headers,request.Token); await SetAndWaitAsync("pause","no",request.Token);
         await SetSubtitleAsync(preferences.SubtitlesEnabled ? "auto" : "no",request.Token);
         request.Token.ThrowIfCancellationRequested();
         // A live URL must use the demuxer's current live start, never a VOD

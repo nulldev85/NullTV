@@ -39,6 +39,17 @@ public sealed record MediaItem(string Id, string SourceId, string Name, string C
     public string Year { get; init; } = "";
     public string MediaSourceId { get; init; } = "";
     public string PlaySessionId { get; init; } = "";
+    public string ContentId { get; init; } = "";
+    public string ContentType { get; init; } = "";
+    public string SeriesContentId { get; init; } = "";
+    public int? Season { get; init; }
+    public int? Episode { get; init; }
+    public string Backdrop { get; init; } = "";
+    public string Rating { get; init; } = "";
+    public string Runtime { get; init; } = "";
+    public string Cast { get; init; } = "";
+    public List<string> Genres { get; init; } = [];
+    public List<MediaSubtitle> Subtitles { get; init; } = [];
     public override string ToString() => Name;
 }
 public sealed record Programme(string ChannelId, string Title, string Description, DateTimeOffset Start, DateTimeOffset End)
@@ -53,7 +64,15 @@ public sealed record Programme(string ChannelId, string Title, string Descriptio
     public string TimeLabel => $"{Start.LocalDateTime:HH:mm} – {End.LocalDateTime:HH:mm}";
     public override string ToString() => $"{TimeLabel}  {Title}";
 }
-public sealed record MediaDetails(string Plot, string Cast, string Rating, List<MediaItem> Episodes);
+public sealed record MediaDetails(string Plot, string Cast, string Rating, List<MediaItem> Episodes)
+{
+    public string ContentId { get; init; } = "";
+    public string Poster { get; init; } = "";
+    public string Backdrop { get; init; } = "";
+    public string Year { get; init; } = "";
+    public string Runtime { get; init; } = "";
+    public List<string> Genres { get; init; } = [];
+}
 public sealed record ServerLibrary(string Id,string Name,string CollectionType,string Logo,bool GenreRequired)
 {
     public List<string> Genres { get; init; } = [];
@@ -78,6 +97,8 @@ public sealed class Profile
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Home";
     public List<Source> Sources { get; set; } = [];
+    public List<StremioAddon> Addons { get; set; } = [];
+    public Dictionary<string,string> AddonTitleMappings { get; set; } = [];
     public HashSet<string> Favorites { get; set; } = [];
     public List<string> FavoriteGuideOrder { get; set; } = [];
     public Dictionary<string,StreamObservation> StreamObservations { get; set; } = [];
@@ -120,6 +141,12 @@ public sealed class Settings
             Appearance.Accent = "#BD93F9";
         }
         LockTimeoutMinutes = Math.Clamp(LockTimeoutMinutes, 1, 120);
+        if(StartupTab=="Media Servers") StartupTab="Integrations";
+        foreach(var profile in Profiles)
+        {
+            if(profile.Addons is null || profile.AddonTitleMappings is null || profile.Addons.Any(a=>a is null || a.Id is null || a.Id.Length!=32 || !a.Id.All(char.IsAsciiHexDigit) || a.Manifest is null || a.Manifest.Resources is null || a.Manifest.Types is null || a.Manifest.Catalogs is null)) throw new InvalidDataException("Settings contain invalid addons.");
+            if(profile.Addons.GroupBy(a=>a.Id).Any(g=>g.Count()>1)) throw new InvalidDataException("Addon identifiers must be unique.");
+        }
         foreach (var s in Profiles.SelectMany(p => p.Sources)) { if(s is null || s.Id is null || s.Id.Length!=32 || !s.Id.All(char.IsAsciiHexDigit) || s.EpgMappings is null || s.Address is null || s.Password is null || s.Username is null || s.ApiKey is null) throw new InvalidDataException("Settings contain an invalid source."); s.RefreshHours = Math.Clamp(s.RefreshHours, 1, 168); if(s.LiveExtension is not ("ts" or "m3u8")) s.LiveExtension="ts"; }
         if(Profiles.SelectMany(p=>p.Sources).GroupBy(s=>s.Id).Any(g=>g.Count()>1)) throw new InvalidDataException("Source identifiers must be unique.");
     }

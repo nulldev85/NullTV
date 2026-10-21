@@ -177,7 +177,7 @@ public sealed partial class MainWindow
             ((TextBlock)headingCopy.Children[0]).Text=playing?.Name??"Now playing";
             ((TextBlock)headingCopy.Children[1]).Text=playing is { } current ? $"{current.Category}  ·  {(current.Kind==MediaKind.Live ? "Live TV" : "On demand")}" : "Choose a channel or title to start watching.";
         }
-        if(backToBrowse!=null) backToBrowse.Content=playbackOrigin=="Guide" ? "Back to guide" : playbackOrigin=="Media Servers" ? "Back to server" : playbackOrigin=="Movies & Series" ? "Back to library" : "Browse channels";
+        if(backToBrowse!=null) backToBrowse.Content=playbackOrigin=="Guide" ? "Back to guide" : playbackOrigin=="Integrations" ? "Back to server" : playbackOrigin=="Movies & Series" ? "Back to library" : "Browse channels";
         if(playerControls!=null) playerControls.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(controlsCard!=null) controlsCard.Visibility=playing==null && lastPlayed==null ? Visibility.Collapsed : Visibility.Visible;
         if(liveSummary!=null) liveSummary.Text=$"CHANNELS  ·  {items.Count(i=>i.Kind==MediaKind.Live):N0}";
@@ -196,7 +196,7 @@ public sealed partial class MainWindow
         if(owner==null) v.KeyPressed+=key=>HandlePlayerKey(key,null,true);
         v.Pressed+=()=> { if(owner==null) { v.Focus(FocusState.Programmatic); playerOverlay?.Reveal(); } };
         v.PointerPressed+=(_,_)=> { if(owner==null) { surface=v; playing=active.GetValueOrDefault(v); } };
-        v.Initialized+=()=> { if(dialogDepth>0 || !IsPlayerVisible || !active.ContainsKey(v)) v.Hide(true); if(v.Player==null) return; v.Player.StateChanged+=QueueTransportUpdate; v.Player.Loaded+=()=>DispatcherQueue.TryEnqueue(()=> { if(!active.ContainsKey(v)) return; validationPlaybackLoads++; status.Text="Playing"; if(ReferenceEquals(surface,v)) infoUpdated=default; UpdatePlaybackControls(); }); v.Player.Ended+=error=>DispatcherQueue.TryEnqueue(()=> { if(error || active.GetValueOrDefault(v)?.Kind==MediaKind.Live) _=GuardAsync(()=>ReconnectAsync(v)); else _=GuardAsync(()=>MarkEndedAsync(v)); }); };
+        v.Initialized+=()=> { if(dialogDepth>0 || !IsPlayerVisible || !active.ContainsKey(v)) v.Hide(true); if(v.Player==null) return; v.Player.StateChanged+=QueueTransportUpdate; v.Player.Loaded+=()=>DispatcherQueue.TryEnqueue(()=> { if(!active.ContainsKey(v)) return; validationPlaybackLoads++; if(active.TryGetValue(v,out var loadedItem) && loadedItem.Subtitles.Count>0) v.Player?.AddSuppliedSubtitles(loadedItem.Subtitles); status.Text="Playing"; if(ReferenceEquals(surface,v)) infoUpdated=default; UpdatePlaybackControls(); }); v.Player.Ended+=error=>DispatcherQueue.TryEnqueue(()=> { if(error || active.GetValueOrDefault(v)?.Kind==MediaKind.Live) _=GuardAsync(()=>ReconnectAsync(v)); else _=GuardAsync(()=>MarkEndedAsync(v)); }); };
         return v;
     }
     private async Task PlayAsync(MediaItem item)
@@ -213,7 +213,7 @@ public sealed partial class MainWindow
         _=GuardAsync(SyncStoppedAsync); await SaveProgressAsync();
         if(request.IsCancellationRequested || closed) return;
         var inGuide=currentTab=="Guide" && item.Kind==MediaKind.Live;
-        if(currentTab is "Guide" or "Live TV" or "Movies & Series" or "Media Servers") playbackOrigin=currentTab;
+        if(currentTab is "Guide" or "Live TV" or "Movies & Series" or "Integrations") playbackOrigin=currentTab;
         if((item.Kind!=MediaKind.Live || inGuide) && multi) ToggleMulti();
         if(!inGuide) Navigate("Now Playing");
         if(surface==null) return;

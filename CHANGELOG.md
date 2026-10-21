@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-10-21
+
+- Integrations brings existing Jellyfin, Emby and Plex connections together with Stremio-compatible addon management.
+- Install manifest URLs or stremio:// links, add Cinemeta, enable or disable addons, refresh catalogs and replace configured links per profile.
+- Movies & series includes addon catalogs, catalog search, genre filters and paging while retaining local library categories.
+- Titles open a full details page with a Dracula source picker, grouped addon results and original library playback versions. Series include seasons and episode-specific source selection.
+- Library title matching uses supplied IMDb metadata, searchable addon catalogs or a saved manual match. Addon streams preserve required request headers and supplied subtitles in the native player.
+- Direct/debrid HTTP(S) links are supported. Raw torrent results are labeled as requiring a streaming service.
+
 ## 0.6.2 — 2026-10-19
 
 - Rounded green progress rails replace rigid hairline tracks. Playback and volume markers appear during interaction, with no permanent ball or needle.

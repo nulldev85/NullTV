@@ -67,7 +67,7 @@ public sealed partial class MainWindow : Window
         titlebar.Loaded+=(_,_)=>UpdateNavigationHitRegion();
         root.LayoutUpdated+=(_,_)=>UpdateNavigationHitRegion();
         navigation.Margin=new Thickness(20,10,20,10);
-        var names=new[] { "Live TV","Guide","Movies & Series","Now Playing","Media Servers","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE768","\uE968","\uE713" };
+        var names=new[] { "Live TV","Guide","Movies & Series","Now Playing","Integrations","Settings" }; var glyphs=new[] { "\uE714","\uE8F2","\uE8B2","\uE768","\uE968","\uE713" };
         for(int i=0;i<names.Length;i++) {
             var name=names[i]; var b=Button(name,()=>Navigate(name)); b.Tag=name;
             var item=new Grid { ColumnSpacing=11 }; item.ColumnDefinitions.Add(new() { Width=new(2) }); item.ColumnDefinitions.Add(new() { Width=new(18) }); item.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) });
@@ -117,7 +117,7 @@ public sealed partial class MainWindow : Window
         imageCache=new(http,Path.Combine(store.DirectoryPath,"images"));
         if(settings.Appearance.Accent is "#D6C3A5" or "#6EE7C4" or "#D3D6DC") settings.Appearance.Accent="#BD93F9";
         ApplyAppearance(); BuildLive(); Navigate(settings.StartupTab);
-        foreach(var s in settings.Profile.Sources) { var cached=await store.LoadCacheAsync(s.Id); if(cached!=null) catalogs[s.Id]=cached; }
+        foreach(var id in settings.Profile.Sources.Select(s=>s.Id).Concat(settings.Profile.Addons.Where(a=>a.Enabled).Select(a=>a.Id))) { var cached=await store.LoadCacheAsync(id); if(cached!=null) catalogs[id]=cached; }
         RebuildItems(); await RefreshAllAsync(false); timer.Start();
         var args=Environment.GetCommandLineArgs(); var index=Array.IndexOf(args,"--smoke-video"); var playlistIndex=Array.IndexOf(args,"--smoke-playlist");
         if(playlistIndex>=0 && playlistIndex+1<args.Length && Array.IndexOf(args,"--data-dir")>=0) { var s=new Source { Name="Local validation",Kind=SourceKind.PlaylistFile,Address=args[playlistIndex+1] }; settings.Profile.Sources.Clear(); settings.Profile.Sources.Add(s); await RefreshSourceAsync(s); Navigate("Live TV"); var channel=items.FirstOrDefault(i=>i.Kind==MediaKind.Live); if(channel!=null) await PlayAsync(channel); }
@@ -202,10 +202,10 @@ public sealed partial class MainWindow : Window
         if(tab is "Live TV" or "Now Playing") { if(livePage!=null) livePage.Visibility=Visibility.Visible; foreach(var s in surfaces) s.Hide(!IsPlayerVisible || !active.ContainsKey(s)); UpdateLiveLayout(); return; }
         // Other pages are rebuilt to reflect profile and settings changes.
         foreach(var child in pageHost.Children.Where(c=>c!=livePage).ToArray()) pageHost.Children.Remove(child);
-        pageHost.Children.Add(tab switch { "Guide"=>BuildGuide(), "Movies & Series"=>BuildLibrary(), "Media Servers"=>BuildServers(), _=>BuildSettings() });
+        pageHost.Children.Add(tab switch { "Guide"=>BuildGuide(), "Movies & Series"=>BuildLibrary(), "Integrations"=>BuildIntegrations(), _=>BuildSettings() });
         if(tab=="Guide") { if(multi) ToggleMulti(); UpdateGuideVideoLayout(); }
     }
-    private void RebuildItems() { int number=0; items=settings.Profile.Sources.SelectMany(s=>catalogs.GetValueOrDefault(s.Id)?.Items??[]).Select(i=>i.Kind==MediaKind.Live ? i with { Number=++number } : i).ToList(); foreach(var catalog in catalogs.Values) foreach(var (id,remote) in catalog.RemoteHistory) { if(!settings.Profile.History.TryGetValue(id,out var local) || remote.Updated>local.Updated) settings.Profile.History[id]=remote; } UpdateLive(); if(currentTab=="Movies & Series") refreshLibrary?.Invoke(); if(currentTab=="Guide") refreshGuide?.Invoke(); }
+    private void RebuildItems() { int number=0; items=settings.Profile.Sources.Select(s=>s.Id).Concat(settings.Profile.Addons.Where(a=>a.Enabled).Select(a=>a.Id)).SelectMany(id=>catalogs.GetValueOrDefault(id)?.Items??[]).Select(i=>i.Kind==MediaKind.Live ? i with { Number=++number } : i).ToList(); foreach(var catalog in catalogs.Values) foreach(var (id,remote) in catalog.RemoteHistory) { if(!settings.Profile.History.TryGetValue(id,out var local) || remote.Updated>local.Updated) settings.Profile.History[id]=remote; } UpdateLive(); if(currentTab=="Movies & Series") refreshLibrary?.Invoke(); if(currentTab=="Guide") refreshGuide?.Invoke(); }
     private async Task RefreshAllAsync(bool force)
     {
         if(!await refreshGate.WaitAsync(0)) return;

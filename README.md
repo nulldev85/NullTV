@@ -1,12 +1,12 @@
 # NullTV
 
-Native Windows 11 ARM64 IPTV and media-server client for Surface Pro 11. Bring your own provider account, playlist, XMLTV guide or media server. No channel lists, sources, logins or content are included.
+Native Windows 11 ARM64 IPTV, media-server and Stremio-compatible addon client for Surface Pro 11. Bring your own provider account, playlist, XMLTV guide, media server or addon. No channel lists, sources, logins or content are included.
 
 ## Run
 
 Run **NullTV-Setup-arm64.msi**, then launch **NullTV** from the Start menu. The per-user installer registers the app in Windows Settings → Apps and installs it under `%LOCALAPPDATA%\Programs\NullTV`. Close an older running build before installing. Your encrypted sources, profiles and history remain under `%LOCALAPPDATA%\NullTV`.
 
-Version **0.6.2** refines the Dracula interface with softly rounded green progress rails, interaction-only playback and volume markers, quieter navigation, lighter panel borders and consistent fields and poster frames. Guide retains its compact preview, dense six-hour timeline, favorite ordering and exact alignment between live progress and the pink now line. Update through **Settings → Updates**.
+Version **0.7.0** adds **Integrations** for Jellyfin, Emby, Plex and Stremio-compatible addons. Browse addon catalogs in Movies & series, open a title's details page, and choose grouped addon results or a library version from the Dracula source picker. Series include seasons and episode-specific sources. Direct/debrid HTTP(S) links, required request headers and supplied subtitles use the existing player; raw torrent streaming is not included. See [addon setup and compatibility](docs/STREMIO.md). Update through **Settings → Updates**.
 
 The optional portable version is **NullTV-win-arm64.zip**: extract it completely and run `NullTV-win-arm64/NullTV.exe`. The folder contains the ARM64 .NET runtime, Windows App SDK runtime and `libmpv-2.dll`; no separate runtime installation is required. Windows 11 ARM64 is required. Keep every file beside the executable. Open **Settings → Sources → Add IPTV source**, enter your account or choose your local M3U/M3U8 file, and save. Click a channel in Live TV.
 

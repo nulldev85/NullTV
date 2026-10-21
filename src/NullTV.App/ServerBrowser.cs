@@ -14,7 +14,7 @@ public sealed partial class MainWindow
     private readonly List<(string Id,string Name)> serverFolders=[];
     private void OpenServerBrowser(Source source)
     {
-        serverBrowseId=source.Id; serverLibraryId=""; serverGenre=""; serverSearch=""; ResetServerPaging(); serverFolders.Clear(); Navigate("Media Servers");
+        serverBrowseId=source.Id; serverLibraryId=""; serverGenre=""; serverSearch=""; ResetServerPaging(); serverFolders.Clear(); Navigate("Integrations");
     }
     private async Task RefreshServerCatalogAsync(Source source)
     {
@@ -25,7 +25,7 @@ public sealed partial class MainWindow
     private void ResetServerPaging() { serverOffset=0; serverPageStarts.Clear(); }
     private void OpenServerLibrary(ServerLibrary library,MediaItem? folder=null)
     {
-        serverLibraryId=library.Id; serverGenre=library.DefaultGenre; serverSearch=""; serverSort="Server order"; ResetServerPaging(); serverFolders.Clear(); if(folder!=null) serverFolders.Add((folder.ProviderId,folder.Name)); Navigate("Media Servers");
+        serverLibraryId=library.Id; serverGenre=library.DefaultGenre; serverSearch=""; serverSort="Server order"; ResetServerPaging(); serverFolders.Clear(); if(folder!=null) serverFolders.Add((folder.ProviderId,folder.Name)); Navigate("Integrations");
     }
     private GridView ServerPosters(IEnumerable<MediaItem> entries,Source source,Action<MediaItem>? folder=null,bool horizontal=false,bool landscape=false)
     {
@@ -46,8 +46,8 @@ public sealed partial class MainWindow
     {
         var catalog=catalogs.GetValueOrDefault(source.Id);
         var actions=new StackPanel { Orientation=Orientation.Horizontal,Spacing=8 };
-        actions.Children.Add(AsyncButton("Refresh",async ()=> { await RefreshServerCatalogAsync(source); if(currentTab=="Media Servers" && serverBrowseId==source.Id) Navigate("Media Servers"); }));
-        actions.Children.Add(Button("All servers",()=> { serverBrowseId=""; Navigate("Media Servers"); }));
+        actions.Children.Add(AsyncButton("Refresh",async ()=> { await RefreshServerCatalogAsync(source); if(currentTab=="Integrations" && serverBrowseId==source.Id) Navigate("Integrations"); }));
+        actions.Children.Add(Button("All integrations",()=> { serverBrowseId=""; Navigate("Integrations"); }));
         if(serverLibraryId!="" && catalog?.Libraries.FirstOrDefault(library=>library.Id==serverLibraryId) is { } selectedLibrary) return BuildServerCollection(source,selectedLibrary,actions);
         var page=new Grid { RowSpacing=12 }; page.RowDefinitions.Add(new() { Height=GridLength.Auto }); page.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) });
         Place(page,Heading(source.Name,$"{source.Kind}  ·  Your libraries, in their server order.",actions));
@@ -55,9 +55,9 @@ public sealed partial class MainWindow
         if(catalog==null || source.Kind is SourceKind.Jellyfin or SourceKind.Emby && !catalog.HasServerLibraries)
         {
             var loading=Text("Loading your server libraries…",14); content.Children.Add(loading);
-            var retry=AsyncButton("Retry",async ()=> { await RefreshServerCatalogAsync(source); Navigate("Media Servers"); }); retry.Visibility=Visibility.Collapsed; content.Children.Add(retry);
+            var retry=AsyncButton("Retry",async ()=> { await RefreshServerCatalogAsync(source); Navigate("Integrations"); }); retry.Visibility=Visibility.Collapsed; content.Children.Add(retry);
             page.Loaded+=async (_,_)=> {
-                try { await RefreshServerCatalogAsync(source); if(currentTab=="Media Servers" && serverBrowseId==source.Id && serverLibraryId=="") Navigate("Media Servers"); }
+                try { await RefreshServerCatalogAsync(source); if(currentTab=="Integrations" && serverBrowseId==source.Id && serverLibraryId=="") Navigate("Integrations"); }
                 catch(Exception e) when(e is not OutOfMemoryException) { loading.Text=Friendly(e); retry.Visibility=Visibility.Visible; }
             };
         }
@@ -81,7 +81,7 @@ public sealed partial class MainWindow
     private UIElement BuildServerCollection(Source source,ServerLibrary library,StackPanel actions)
     {
         var page=new Grid { RowSpacing=14 }; page.RowDefinitions.Add(new() { Height=GridLength.Auto }); page.RowDefinitions.Add(new() { Height=GridLength.Auto }); page.RowDefinitions.Add(new() { Height=new(1,GridUnitType.Star) }); page.RowDefinitions.Add(new() { Height=GridLength.Auto });
-        var back=Button(serverFolders.Count>0 ? "Back" : "Libraries",()=> { if(serverFolders.Count>0) serverFolders.RemoveAt(serverFolders.Count-1); else serverLibraryId=""; ResetServerPaging(); serverSearch=""; Navigate("Media Servers"); }); actions.Children.Insert(0,back);
+        var back=Button(serverFolders.Count>0 ? "Back" : "Libraries",()=> { if(serverFolders.Count>0) serverFolders.RemoveAt(serverFolders.Count-1); else serverLibraryId=""; ResetServerPaging(); serverSearch=""; Navigate("Integrations"); }); actions.Children.Insert(0,back);
         var title=serverFolders.LastOrDefault().Name??library.Name; var parent=serverFolders.LastOrDefault().Id??library.Id;
         Place(page,Heading(title,source.Name+"  ·  "+library.Name,actions));
         var search=SearchBox("Search this library"); search.Text=serverSearch; search.MinWidth=260;
@@ -91,7 +91,7 @@ public sealed partial class MainWindow
         var genre=Choice("",genreValues.Keys,serverGenre=="" || serverGenre.Equals("None",StringComparison.OrdinalIgnoreCase) ? "All genres" : serverGenre); genre.MinWidth=150; genre.MaxWidth=220; genre.Visibility=library.Genres.Count>0 && serverFolders.Count==0 ? Visibility.Visible : Visibility.Collapsed;
         var sort=Choice("",source.Kind==SourceKind.Plex ? new[]{"Server order","Title A–Z"} : new[]{"Server order","Title A–Z","Newest"},serverSort); sort.MinWidth=150;
         var controls=new Grid { ColumnSpacing=12 }; controls.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); controls.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); Place(controls,search); Place(controls,genre,0,1); Place(controls,sort,0,2); Place(page,controls,1);
-        void OpenFolder(MediaItem item) { serverFolders.Add((item.ProviderId,item.Name)); ResetServerPaging(); serverSearch=""; Navigate("Media Servers"); }
+        void OpenFolder(MediaItem item) { serverFolders.Add((item.ProviderId,item.Name)); ResetServerPaging(); serverSearch=""; Navigate("Integrations"); }
         var list=ServerPosters([],source,OpenFolder); Place(page,list,2);
         var message=Text("Loading titles…",14); message.HorizontalAlignment=HorizontalAlignment.Center; message.VerticalAlignment=VerticalAlignment.Center; Place(page,message,2);
         var footer=new Grid { ColumnSpacing=10 }; footer.ColumnDefinitions.Add(new() { Width=new(1,GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width=GridLength.Auto }); footer.ColumnDefinitions.Add(new() { Width=GridLength.Auto });

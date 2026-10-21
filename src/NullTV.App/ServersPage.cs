@@ -21,7 +21,7 @@ public sealed partial class MainWindow
         try { foreach(var (v,item) in active.ToArray()) { var s=settings.Profile.Sources.FirstOrDefault(s=>s.Id==item.SourceId); if(s?.Kind is not (SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex) || v.Player==null) continue; var state=v.Player.State; await new MediaServerClient(http).ProgressAsync(s,item,state.Position,state.Duration,false,request.Token); } }
         finally { serverSyncGate.Release(); }
     }
-    private UIElement BuildServers()
+    private UIElement BuildServers(bool embedded=false)
     {
         var selected=settings.Profile.Sources.FirstOrDefault(source=>source.Id==serverBrowseId && source.Kind is SourceKind.Jellyfin or SourceKind.Emby or SourceKind.Plex);
         if(selected!=null) return BuildServerBrowser(selected);
@@ -53,7 +53,7 @@ public sealed partial class MainWindow
         Place(connectors,Connector("Jellyfin","jellyfin.svg","Connect your own server with a login or API key.","Connect Jellyfin",ConnectServerAsync));
         Place(connectors,Connector("Emby","emby.png","Browse your libraries and sync watched progress.","Connect Emby",()=>ConnectServerAsync(SourceKind.Emby)),0,1);
         Place(connectors,Connector("Plex","plex.svg","Sign in with a short code and connect your server.","Sign in with PIN",ConnectPlexAsync),0,2); page.Children.Add(connectors);
-        var note=Text("Your libraries stay with you. NullTV connects to the servers you choose and remembers where you left off.",12); note.Opacity=.45; note.Margin=new Thickness(4,12,0,0); page.Children.Add(note); return Scroll(page);
+        var note=Text("Your libraries stay with you. NullTV connects to the servers you choose and remembers where you left off.",12); note.Opacity=.45; note.Margin=new Thickness(4,12,0,0); page.Children.Add(note); return embedded ? page : Scroll(page);
     }
     private Task ConnectServerAsync() => ConnectServerAsync(SourceKind.Jellyfin);
     private async Task ConnectServerAsync(SourceKind serverKind)
